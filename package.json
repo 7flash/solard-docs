@@ -1,0 +1,14 @@
+{
+  "name": "solard-tradjs-landing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun scripts/dev.ts",
+    "build": "bun node_modules/tradjs/bin/melina.ts build",
+    "start": "bun scripts/dev.ts"
+  },
+  "dependencies": {
+    "tradjs": "4.2.0"
+  }
+}
