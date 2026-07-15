@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#000000">
+<title>SOLARD — documentation</title>
+<meta name="description" content="Solard documentation: quickstart, architecture, CLI reference, web console, venues and routing, launching, scripts, and AI agent integration.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000'/%3E%3Cpath d='M10.5 4h16l-3.4 5h-16z' fill='%23fff'/%3E%3Cpath d='M7.1 13.5h16l3.4 5h-16z' fill='%23fff'/%3E%3Cpath d='M10.5 23h16l-3.4 5h-16z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#000;--line:#161616;--line2:#2c2c2c;--ink:#f2f2f2;--dim:#8f8f8f;--faint:#585858;
+  --grn:#1fd35f;--grn-dim:#0f4d26;--red:#e05555;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;--disp:'Chakra Petch',var(--mono);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+::selection{background:var(--grn);color:#000}
+a{color:inherit}
+.grn{color:var(--grn)}
+code{color:var(--grn);font-size:.95em}
+.wrap{max-width:1120px;margin:0 auto;padding:0 26px}
+
+/* nav */
+header{position:sticky;top:0;z-index:20;background:rgba(0,0,0,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+nav{display:flex;align-items:center;height:52px;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.brand .wm{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.24em}
+.brand .sfx{color:var(--faint);font-size:12px;letter-spacing:.1em;margin-left:2px}
+.mark path{fill:currentColor}
+.nav-links{margin-left:auto;display:flex;gap:20px;align-items:center}
+.nav-links a{color:var(--faint);text-decoration:none;font-size:12.5px}
+.nav-links a:hover{color:var(--ink)}
+.nav-links a.act{color:#000;background:var(--grn);padding:5px 12px;font-weight:500}
+
+/* layout */
+.docs{display:grid;grid-template-columns:220px 1fr;gap:48px;padding:44px 0 80px}
+@media(max-width:860px){.docs{grid-template-columns:1fr;gap:24px}}
+
+/* sidebar */
+aside{position:sticky;top:76px;align-self:start;max-height:calc(100vh - 100px);overflow-y:auto}
+@media(max-width:860px){aside{position:static;max-height:none;border:1px solid var(--line);padding:16px;background:#020202}}
+aside .grp{color:var(--faint);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;margin:18px 0 8px;font-family:var(--disp);font-weight:600}
+aside .grp:first-child{margin-top:0}
+aside a{display:block;color:var(--dim);text-decoration:none;font-size:12.5px;padding:3px 0 3px 12px;border-left:1px solid var(--line)}
+aside a:hover{color:var(--ink)}
+aside a.on{color:var(--grn);border-left-color:var(--grn)}
+
+/* content */
+article{min-width:0}
+section{padding:8px 0 44px;border-bottom:1px solid var(--line);margin-bottom:44px}
+section:last-child{border-bottom:0}
+h1{font-family:var(--disp);font-size:clamp(26px,4vw,38px);font-weight:700;letter-spacing:.03em;text-transform:uppercase;line-height:1.15;margin-bottom:14px}
+h2{font-family:var(--disp);font-size:20px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:14px}
+h2 .hash{color:var(--grn-dim);margin-right:8px}
+h3{font-size:13.5px;font-weight:600;color:var(--ink);margin:26px 0 8px}
+h3::before{content:"▸ ";color:var(--grn)}
+p{color:var(--dim);margin-bottom:14px;max-width:720px}
+p b,li b{color:var(--ink);font-weight:500}
+ul.plain{list-style:none;margin:0 0 14px;display:flex;flex-direction:column;gap:6px}
+ul.plain li{color:var(--dim);font-size:12.5px;padding-left:16px;position:relative}
+ul.plain li::before{content:"—";position:absolute;left:0;color:var(--grn)}
+
+/* code blocks */
+.code{border:1px solid var(--line);margin:14px 0 20px;background:#020202;max-width:760px}
+.code .bar{padding:8px 14px;border-bottom:1px solid var(--line);color:var(--faint);font-size:11.5px;display:flex;justify-content:space-between;align-items:center}
+.code .bar button{background:transparent;border:1px solid var(--line2);color:var(--faint);font-family:var(--mono);font-size:10.5px;padding:2px 8px;cursor:pointer}
+.code .bar button:hover{color:var(--ink)}
+.code pre{padding:16px 18px;overflow-x:auto;font-size:12.5px;line-height:1.75;color:#bcbcbc}
+.c-k{color:#a06bff}.c-f{color:#4f7cf7}.c-s{color:var(--grn)}.c-c{color:var(--faint)}.c-n{color:#f0c04a}
+
+/* tables */
+table{width:100%;max-width:760px;border-collapse:collapse;margin:14px 0 20px;font-size:12.5px}
+th{font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:left;padding:8px 14px 8px 0;border-bottom:1px solid var(--line2)}
+td{color:var(--dim);padding:8px 14px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td:first-child{color:var(--grn);white-space:nowrap}
+td b{color:var(--ink);font-weight:500}
+
+/* callouts */
+.note{border:1px solid var(--grn-dim);background:rgba(31,211,95,.03);padding:14px 18px;margin:14px 0 20px;font-size:12.5px;color:var(--dim);max-width:760px}
+.note b{color:var(--grn);font-weight:500}
+.warn{border:1px solid #4d2a0f;background:rgba(240,192,74,.03);padding:14px 18px;margin:14px 0 20px;font-size:12.5px;color:var(--dim);max-width:760px}
+.warn b{color:#f0c04a;font-weight:500}
+
+/* venue compare */
+.vgrid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);max-width:760px;margin:14px 0 20px}
+.vgrid .v{padding:18px 20px}
+.vgrid .v + .v{border-left:1px solid var(--line)}
+.vgrid .vt{font-family:var(--disp);font-weight:600;font-size:12.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--grn);margin-bottom:10px}
+.vgrid ul{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--dim)}
+.vgrid li::before{content:"— ";color:var(--faint)}
+@media(max-width:560px){.vgrid{grid-template-columns:1fr}.vgrid .v + .v{border-left:0;border-top:1px solid var(--line)}}
+
+/* pipeline inline */
+.pipe{font-size:12.5px;color:var(--dim);border:1px solid var(--line2);padding:14px 18px;margin:14px 0 20px;max-width:760px;overflow-x:auto;white-space:nowrap}
+.pipe i{color:var(--grn);font-style:normal}
+
+footer{border-top:1px solid var(--line);padding:26px 0}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--faint);font-size:12px}
+.foot a{color:var(--faint);text-decoration:none}
+.foot a:hover{color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <a class="brand" href="./solard-landing.html">
+        <svg class="mark" width="18" height="18" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M10.5 4h16l-3.4 5h-16z"/><path d="M7.1 13.5h16l3.4 5h-16z"/><path d="M10.5 23h16l-3.4 5h-16z"/>
+        </svg>
+        <span class="wm">SOLARD</span><span class="sfx">/docs</span>
+      </a>
+      <div class="nav-links">
+        <a href="./solard-landing.html">home</a>
+        <a href="https://github.com/7flash/solard">github</a>
+        <a class="act" href="#quickstart">quickstart →</a>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap docs">
+
+<aside id="side">
+  <div class="grp">Start here</div>
+  <a href="#overview">Overview</a>
+  <a href="#quickstart">Quickstart</a>
+  <a href="#how">How it works</a>
+  <div class="grp">Interfaces</div>
+  <a href="#cli">CLI reference</a>
+  <a href="#web">Web console</a>
+  <div class="grp">Trading</div>
+  <a href="#venues">Venues &amp; routing</a>
+  <a href="#senders">Senders</a>
+  <a href="#launch">Launching tokens</a>
+  <div class="grp">Extend</div>
+  <a href="#scripts">Scripts &amp; workflows</a>
+  <a href="#agents">AI agents</a>
+  <a href="#api">HTTP API</a>
+  <div class="grp">Reference</div>
+  <a href="#env">Environment</a>
+  <a href="#safety">Safety model</a>
+</aside>
+
+<article>
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <h1>Solard Documentation</h1>
+  <p>Solard is a <b>local-first Solana trading terminal</b> and a <b>multi-wallet CLI/SDK</b> for memecoin traders and AI agents. It runs entirely on your machine: transactions are constructed locally against venue programs directly (no Jupiter, no aggregator), signed with keys that never leave an encrypted local SQLite database, and submitted through your own RPC, Helius Sender, or Jito.</p>
+  <p>There is one binary with two personalities:</p>
+  <ul class="plain">
+    <li><b>solard start</b> — boots the supervised worker fleet and the web console (live pump feed, trading, portfolio, launches, signals).</li>
+    <li><b>solard &lt;command&gt;</b> — the headless CLI: wallets, groups, trades, quotes, launches, scripts. Everything the console does, scriptable.</li>
+  </ul>
+  <p>Both read and write the same local database, so anything you do in one is visible in the other — and in any script or agent you point at it.</p>
+  <div class="note"><b>Design rule:</b> the kernel is boring on purpose. It knows how to talk to venues, sign, send, and persist. Strategy — when to buy, what to snipe, how to exit — lives in <i>your</i> scripts, outside the kernel. The kernel never imports scripts; scripts import the kernel.</div>
+</section>
+
+<!-- QUICKSTART -->
+<section id="quickstart">
+  <h2><span class="hash">#</span>Quickstart</h2>
+  <h3>Requirements</h3>
+  <ul class="plain">
+    <li><b>Bun</b> ≥ 1.1 — solard is Bun-native (SQLite, workers, single-file compile).</li>
+    <li>A <b>Helius API key</b> (free tier works for the feed; paid for LaserStream/Sender).</li>
+    <li>Optional: a Jito block engine endpoint for bundles.</li>
+  </ul>
+  <h3>Install</h3>
+  <div class="code"><div class="bar"><span>shell</span><button data-c="git clone https://github.com/7flash/solard && cd solard && bun install">copy</button></div>
+<pre><span class="c-c">$</span> git clone https://github.com/7flash/solard
+<span class="c-c">$</span> cd solard
+<span class="c-c">$</span> bun install
+<span class="c-c">$</span> cp .env.example .env   <span class="c-c"># then set HELIUS_RPC_URL + SOLARD_MASTER_KEY</span></pre></div>
+  <h3>Boot the console</h3>
+  <div class="code"><div class="bar"><span>shell</span><button data-c="bun bin/solard.ts start --open">copy</button></div>
+<pre><span class="c-c">$</span> bun bin/solard.ts start --open
+<span class="c-c"># workers come online, console opens at http://localhost:3000</span>
+<span class="c-c"># flags: --host 0.0.0.0 --port 4000 to serve on your LAN</span></pre></div>
+  <h3>First (simulated) trade</h3>
+  <div class="code"><div class="bar"><span>shell</span><button data-c="">copy</button></div>
+<pre><span class="c-c">$</span> solard import <span class="c-s">&lt;base58_private_key&gt;</span> main   <span class="c-c"># encrypted with SOLARD_MASTER_KEY</span>
+<span class="c-c">$</span> solard token <span class="c-s">&lt;token_ca&gt;</span> wif              <span class="c-c"># register + fetch metadata</span>
+<span class="c-c">$</span> solard quote buy wif --sol 0.5            <span class="c-c"># inspect the quote, nothing sent</span>
+<span class="c-c">$</span> solard buy wif -w main --sol 0.5 --simulate-only</pre></div>
+  <p>Nothing in the steps above can spend SOL. Live execution is a separate, explicit decision — see <a href="#safety" class="grn">the safety model</a>.</p>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <h2><span class="hash">#</span>How it works</h2>
+  <p>Solard is a set of <b>independent workers</b> supervised by <b>bgrun</b>, all writing into <b>one local SQLite database</b>, with three read surfaces on top. No worker talks to another worker; the database is the only contract.</p>
+  <div class="pipe">
+    <i>streams</i> (helius-logs · laserstream · pumpportal · curve-snapshots · holder-snapshots) ──▶ <i>solard.db</i> (tokens · trades · holders · indicators · encrypted wallets) ──▶ <i>surfaces</i> (web console · CLI · SDK / scripts / agents)
+  </div>
+  <h3>The worker fleet</h3>
+  <table>
+    <tr><th>worker</th><th>kind</th><th>what it does</th></tr>
+    <tr><td>server-worker</td><td>server</td><td>Serves the web console and the HTTP API.</td></tr>
+    <tr><td>helius-logs</td><td>stream</td><td>Standard <b>logsSubscribe</b> on the pump program; parses create/trade events from logs.</td></tr>
+    <tr><td>helius-laserstream</td><td>stream</td><td><b>transactionSubscribe</b> over LaserStream for full parsed transactions with lower latency.</td></tr>
+    <tr><td>pumpportal-live</td><td>stream</td><td>Independent second opinion on the same market — used to cross-check the Helius feeds.</td></tr>
+    <tr><td>curve-snapshots</td><td>stream</td><td>Polls bonding-curve accounts directly for ground-truth reserves and progress.</td></tr>
+    <tr><td>holder-snapshots</td><td>stream</td><td>Samples largest token accounts on an interval; powers the distribution view.</td></tr>
+    <tr><td>metadata-repair</td><td>stream</td><td>Backfills missing token metadata behind a circuit breaker (fail fast, cool down, retry).</td></tr>
+    <tr><td>reconciler</td><td>reconciler</td><td>Compares feeds, marks stale ingestion, repairs divergence between sources.</td></tr>
+    <tr><td>telegram-signals</td><td>signals</td><td>Polls configured Telegram channels and projects calls into the signals table.</td></tr>
+  </table>
+  <h3>Supervision &amp; tracing</h3>
+  <p>Every worker registers with bgrun with a <b>staleness deadline</b> — if a stream stops writing heartbeats, it's restarted, and the console shows it as degraded before your positions notice. Every operation is traced end-to-end with <b>measure-fn</b>: quotes, sends, confirmations, feed ingestion — all have timing spans you can inspect when something is slow.</p>
+  <h3>Why multiple feeds for the same market?</h3>
+  <p>Because each one lies differently. Log parsing is cheap but drops events under load; LaserStream is complete but is a different subscription model; PumpPortal is someone else's infrastructure. The reconciler's job is to notice when they disagree, and the <b>live doctor</b> (<code>/api/terminal/doctor</code>) will tell you exactly which feed is stale and since when.</p>
+</section>
+
+<!-- CLI -->
+<section id="cli">
+  <h2><span class="hash">#</span>CLI reference</h2>
+  <p>Everything below persists into the shared database and is immediately visible in the web console. Run <code>solard help</code> for the always-current version of this list.</p>
+
+  <h3>Wallets &amp; tokens</h3>
+  <div class="code"><div class="bar"><span>solard — wallets &amp; tokens</span></div>
+<pre>solard import <span class="c-s">&lt;private_key&gt;</span> [name]          <span class="c-c"># encrypted at rest</span>
+cat key.json | solard import --stdin [name]
+solard wallets [--token <span class="c-s">&lt;token&gt;</span>] [--addresses-only]
+solard token <span class="c-s">&lt;token_ca&gt;</span> [name] [--metadata-json <span class="c-s">&lt;json&gt;</span>]
+solard token set <span class="c-s">&lt;token|ca&gt;</span> [--pool <span class="c-s">&lt;address&gt;</span>] [--quote-mint <span class="c-s">&lt;mint&gt;</span>]
+solard token refresh <span class="c-s">&lt;token|ca&gt;</span>
+solard tokens</pre></div>
+
+  <h3>Groups</h3>
+  <div class="code"><div class="bar"><span>solard — groups</span></div>
+<pre>solard group create <span class="c-s">&lt;name&gt;</span> [description]
+solard group add <span class="c-s">&lt;group&gt;</span> <span class="c-s">&lt;wallet&gt;</span> [weight_bps]   <span class="c-c"># weighted sizing</span>
+solard group add-many <span class="c-s">&lt;group&gt;</span> w1,w2,w3
+solard group show <span class="c-s">&lt;group&gt;</span>
+solard group list</pre></div>
+
+  <h3>Prices &amp; quotes</h3>
+  <div class="code"><div class="bar"><span>solard — prices</span></div>
+<pre>solard quote buy <span class="c-s">&lt;token|ca&gt;</span> --sol <span class="c-n">0.5</span>      <span class="c-c"># inspect without submitting</span>
+solard price <span class="c-s">&lt;token|ca&gt;</span>                    <span class="c-c"># sample current venue price</span>
+solard price average <span class="c-s">&lt;token|ca&gt;</span> --period 15m
+solard price watch <span class="c-s">&lt;token...&gt;</span> [--interval 1s] [--period 1m]</pre></div>
+
+  <h3>Trading</h3>
+  <div class="code"><div class="bar"><span>solard — trading</span></div>
+<pre>solard buy <span class="c-s">&lt;token|ca&gt;</span> (-w <span class="c-s">&lt;wallet&gt;</span> | --wallets w1,w2 | --group <span class="c-s">&lt;name&gt;</span>)
+           --sol <span class="c-n">0.5</span> [--slippage-bps <span class="c-n">1500</span>] [--sender rpc|helius|jito] [--simulate-only]
+
+solard sell <span class="c-s">&lt;token|ca&gt;</span> (-w <span class="c-s">&lt;wallet&gt;</span> | --wallets w1,w2 | --group <span class="c-s">&lt;name&gt;</span>)
+            [--bps <span class="c-n">10000</span>] [--slippage-bps <span class="c-n">1500</span>] [--sender rpc|helius|jito] [--simulate-only]
+
+solard claim <span class="c-s">&lt;token|ca&gt;</span> -w <span class="c-s">&lt;wallet&gt;</span>          <span class="c-c"># pump creator fees</span>
+solard unwrap-wsol (-w <span class="c-s">&lt;wallet&gt;</span> | --group <span class="c-s">&lt;name&gt;</span>)</pre></div>
+  <p>Exactly one of <code>--wallet</code>, <code>--wallets</code>, or <code>--group</code> must be supplied. Group trades over <code>--sender jito</code> are packed as bundles, <b>five transactions per bundle</b>. <code>--bps 10000</code> on sell means the full position; <code>--bps 5000</code> is half.</p>
+
+  <h3>Watching &amp; transactions</h3>
+  <div class="code"><div class="bar"><span>solard — watch / history / ALTs</span></div>
+<pre>solard watch token <span class="c-s">&lt;token|ca&gt;</span> [label]
+solard watch wallet <span class="c-s">&lt;wallet&gt;</span> [label]
+solard watch program <span class="c-s">&lt;address&gt;</span> [label]
+solard watch list
+solard history
+solard jito tip-accounts
+solard alt create -w <span class="c-s">&lt;wallet&gt;</span>               <span class="c-c"># address lookup tables</span>
+solard alt extend <span class="c-s">&lt;address&gt;</span> -w <span class="c-s">&lt;wallet&gt;</span> <span class="c-s">&lt;account...&gt;</span></pre></div>
+
+  <h3>Scripts &amp; workers</h3>
+  <div class="code"><div class="bar"><span>solard — scripts / workers</span></div>
+<pre>solard scripts                              <span class="c-c"># list solard.config.ts registrations</span>
+solard run <span class="c-s">&lt;name-or-path&gt;</span> [flags...]
+solard workers status                       <span class="c-c"># fleet health from the CLI</span>
+solard workers ensure                       <span class="c-c"># start anything that's down</span></pre></div>
+</section>
+
+<!-- WEB -->
+<section id="web">
+  <h2><span class="hash">#</span>Web console</h2>
+  <p><code>solard start --open</code> serves the console at <code>http://localhost:3000</code>. It is a thin, fast view over the same database the CLI writes — SSR-rendered, keyboard-driven, no build step.</p>
+  <table>
+    <tr><th>page</th><th>what's on it</th></tr>
+    <tr><td>/terminal</td><td>The live pump feed: new creates, trades, curve progress, SMA indicators, per-token holder distribution, feed-health strip.</td></tr>
+    <tr><td>/trade</td><td>Buy/sell forms against any registered token, wallet/group selector, sender choice, quote preview, simulation results before anything is live.</td></tr>
+    <tr><td>/portfolio</td><td>Positions across all wallets and groups: cost basis, current venue price, unrealized PnL, claimable creator fees.</td></tr>
+    <tr><td>/wallets</td><td>Import, group management, weights, batch SOL balances, batch fund/sweep.</td></tr>
+    <tr><td>/watchlists</td><td>Watched tokens, wallets, and programs with live activity.</td></tr>
+    <tr><td>/launch</td><td>Full pump.fun launch flow: metadata upload, vanity mint, buyer-group coordination, submit mode — as a form. Launches run as background jobs with step-by-step logs.</td></tr>
+    <tr><td>/signals</td><td>Telegram signal projections mapped onto live token state.</td></tr>
+    <tr><td>/activity</td><td>Everything solard has executed: sends, confirmations, errors, with measure-fn traces.</td></tr>
+  </table>
+  <h3>Auth</h3>
+  <p>The console binds to localhost by default and needs no auth. If you serve it beyond localhost (<code>--host 0.0.0.0</code>), set <code>SOLARD_WEB_TOKEN</code> — every browser and API call must then send it as the <code>x-solard-web-token</code> header.</p>
+  <div class="warn"><b>Exposure warning:</b> the console can see wallet balances and (behind the live gate) trigger trades. Don't port-forward it to the internet; use a VPN or SSH tunnel if you need remote access.</div>
+</section>
+
+<!-- VENUES -->
+<section id="venues">
+  <h2><span class="hash">#</span>Venues &amp; routing</h2>
+  <p>A <b>venue</b> is anywhere a token can be traded. Solard ships two venue plugins and constructs their instructions manually — no aggregator in the path, which means no aggregator fees, no extra CPI depth, and quotes computed from on-chain state you fetched yourself.</p>
+  <div class="vgrid">
+    <div class="v">
+      <div class="vt">pump-curve</div>
+      <ul>
+        <li>pump.fun bonding curve, pre-migration</li>
+        <li>quote = exact curve math from the bonding account</li>
+        <li>buy/sell + creator-fee claims</li>
+        <li>launch deployments happen here</li>
+      </ul>
+    </div>
+    <div class="v">
+      <div class="vt">pumpswap-amm</div>
+      <ul>
+        <li>PumpSwap pool, post-migration</li>
+        <li>quote = constant-product from pool reserves</li>
+        <li>buy/sell via direct AMM CPIs</li>
+        <li>pool + quote mint overridable per token</li>
+      </ul>
+    </div>
+  </div>
+  <h3>The route resolver</h3>
+  <p>You never pick a venue by hand. For each trade the resolver reads the token's on-chain state: if the bonding curve is live and incomplete, the trade routes to <b>pump-curve</b>; once the token has migrated, it routes to <b>pumpswap-amm</b> using the stored (or auto-discovered) pool. The decision happens at quote time, so a token that migrates between your quote and your send fails loudly instead of trading against a dead curve.</p>
+  <p>Venues are a plugin interface — adding a new one means implementing <code>quoteBuy</code> / <code>quoteSell</code> / instruction builders, and every workflow, script, and console form gets it for free.</p>
+</section>
+
+<!-- SENDERS -->
+<section id="senders">
+  <h2><span class="hash">#</span>Senders</h2>
+  <p>Venue plugins produce instructions; <b>senders</b> get them on chain. Pick per trade with <code>--sender</code>.</p>
+  <table>
+    <tr><th>sender</th><th>path</th><th>when to use</th></tr>
+    <tr><td>rpc</td><td>Your RPC's <b>sendTransaction</b> with priority fees.</td><td>Default. Cheap, fine for anything that isn't a race.</td></tr>
+    <tr><td>helius</td><td>Helius <b>Sender</b> fast lane with a tip account.</td><td>Latency-sensitive single transactions — snipes, exits. Configure <code>HELIUS_SENDER_URL</code> + <code>HELIUS_TIP_ACCOUNT</code>.</td></tr>
+    <tr><td>jito</td><td>Bundles via a Jito block engine.</td><td>Atomic group execution: 5 tx per bundle, all-or-nothing per bundle. Group buys/sells and coordinated launch buys.</td></tr>
+  </table>
+  <p>Every sender path supports simulation first; <code>--simulate-only</code> runs the full pipeline — quote, build, simulate — and stops before broadcast, printing compute units and balance changes.</p>
+</section>
+
+<!-- LAUNCH -->
+<section id="launch">
+  <h2><span class="hash">#</span>Launching tokens</h2>
+  <p>A pump.fun launch in solard is one command coordinating three phases: <b>metadata → deployment → buyer wave</b>.</p>
+  <div class="code"><div class="bar"><span>shell</span></div>
+<pre><span class="c-c">$</span> solard launch pump --creator dev \
+    --image ./logo.png --description <span class="c-s">"..."</span> \
+    --buyer-group snipers \
+    --submit-mode spam-after-market-ready \
+    --sender-tps <span class="c-n">40</span> --helius-tip-sol <span class="c-n">0.01</span> \
+    --live</pre></div>
+  <h3>Metadata</h3>
+  <p>Uploaded to IPFS through the <b>pump frontend endpoint</b> by default, or <b>Pinata</b> with <code>PUMP_METADATA_PROVIDER=pinata</code> + a JWT. Twitter/Telegram/website/video links ride along; <code>--hide-name</code> supported. You can also pre-upload with <code>solard metadata upload</code> and pass <code>--uri</code>.</p>
+  <h3>Vanity mints</h3>
+  <p>The launcher can grind a mint keypair whose address ends in your chosen suffix (multi-threaded, runs while you prepare metadata), so your CA reads like <code>...pump</code> or your ticker.</p>
+  <h3>Submit modes</h3>
+  <table>
+    <tr><th>mode</th><th>behavior</th></tr>
+    <tr><td>after-deploy-processed</td><td>Wait for the deploy tx to reach <b>processed</b>, then send buyer transactions. Safest, default.</td></tr>
+    <tr><td>spam-after-market-ready</td><td>Start firing buys the instant the curve account exists, resending at <code>--sender-tps</code> until confirmed. For competitive launches.</td></tr>
+    <tr><td>fast-spam</td><td>Fire buys alongside the deploy without waiting. Maximum aggression, expect some failures.</td></tr>
+  </table>
+  <p>Buyer-group transactions are pre-built against a prepared <b>address lookup table</b> (<code>solard run prepare-pump-launch-alt</code>) so they fit and land smaller. Every launch runs as a background job — watch it on <code>/launch</code> or tail the CLI output.</p>
+</section>
+
+<!-- SCRIPTS -->
+<section id="scripts">
+  <h2><span class="hash">#</span>Scripts &amp; workflows</h2>
+  <p>Your strategy is a TypeScript file that imports the SDK. Register it in <code>solard.config.ts</code>, run it with <code>solard run</code>, pass it flags like any command.</p>
+  <div class="code"><div class="bar"><span>solard.config.ts</span></div>
+<pre><span class="c-k">import</span> { defineSolardConfig } <span class="c-k">from</span> <span class="c-s">"solard/runner"</span>;
+
+<span class="c-k">export default</span> <span class="c-f">defineSolardConfig</span>({
+  scripts: {
+    snipe: <span class="c-s">"./scripts/snipe.ts"</span>,
+    dca:   { path: <span class="c-s">"./scripts/dca.ts"</span>, description: <span class="c-s">"laddered entries"</span> },
+  },
+});</pre></div>
+  <div class="code"><div class="bar"><span>scripts/snipe.ts</span></div>
+<pre><span class="c-k">import</span> { openSolard } <span class="c-k">from</span> <span class="c-s">"solard"</span>;
+
+<span class="c-k">const</span> solard = <span class="c-k">await</span> <span class="c-f">openSolard</span>();          <span class="c-c">// shared db + env</span>
+
+<span class="c-c">// wait for a launch matching a name, then buy across a group</span>
+<span class="c-k">const</span> launch = <span class="c-k">await</span> solard.launches.<span class="c-f">waitFor</span>({ name: <span class="c-s">"EXACT NAME"</span> });
+<span class="c-k">const</span> receipt = <span class="c-k">await</span> solard.<span class="c-f">buy</span>({
+  token: launch.mint,
+  group: <span class="c-s">"snipers"</span>,
+  sol: <span class="c-n">0.05</span>,
+  sender: <span class="c-s">"jito"</span>,
+  live: process.argv.includes(<span class="c-s">"--live"</span>),   <span class="c-c">// simulate by default</span>
+});
+console.log(receipt.signatures);</pre></div>
+  <h3>Built-in workflows</h3>
+  <table>
+    <tr><th>workflow</th><th>what it composes</th></tr>
+    <tr><td>snipe</td><td>Launch discovery → group buy the moment the market exists.</td></tr>
+    <tr><td>claim-trade-send</td><td>Claim creator fees from any claim source → buy a token quoted in the same asset → deliver the guaranteed minimum output to a recipient. Venue-agnostic.</td></tr>
+    <tr><td>wait-launch-trade-group</td><td>Block on a launch source, then execute a coordinated group entry with per-wallet sizing.</td></tr>
+  </table>
+  <p>Workflows are plugins too — they receive a host with <code>resolveToken</code>, <code>route</code>, <code>signer</code>, and the sender registry, so they work on any venue that exists now or later.</p>
+</section>
+
+<!-- AGENTS -->
+<section id="agents">
+  <h2><span class="hash">#</span>AI agents</h2>
+  <p>Solard was built to be driven by agents as much as by humans. There are <b>three integration surfaces</b>, in order of tightness. In all three, the <a href="#safety" class="grn">safety gate</a> stays in charge: an agent cannot trade live unless you flipped <code>SOLARD_ENABLE_LIVE_TRADES=1</code>, no matter what it asks for.</p>
+
+  <h3>1 · The SDK — for TypeScript agents</h3>
+  <p>If your agent runs in Bun/Node, import solard directly. Everything is typed: wallet refs, token refs, group refs, quotes, receipts. This is the same code path the CLI uses.</p>
+  <div class="code"><div class="bar"><span>agent.ts</span></div>
+<pre><span class="c-k">import</span> { openSolard } <span class="c-k">from</span> <span class="c-s">"solard"</span>;
+
+<span class="c-k">const</span> solard = <span class="c-k">await</span> <span class="c-f">openSolard</span>();
+
+<span class="c-c">// register the agent — its actions are attributed in activity logs</span>
+<span class="c-k">const</span> agent = <span class="c-k">await</span> solard.agents.<span class="c-f">create</span>(<span class="c-s">"scout-1"</span>, {
+  wallet: <span class="c-s">"agent-hot"</span>,
+  config: { maxSolPerTrade: <span class="c-n">0.25</span>, allowedVenues: [<span class="c-s">"pump-curve"</span>] },
+});
+
+<span class="c-c">// read market state the workers have already indexed</span>
+<span class="c-k">const</span> feed = <span class="c-k">await</span> solard.terminal.<span class="c-f">feed</span>({ limit: <span class="c-n">50</span> });
+<span class="c-k">const</span> holders = <span class="c-k">await</span> solard.terminal.<span class="c-f">holders</span>(feed[<span class="c-n">0</span>].mint);
+
+<span class="c-c">// quote → decide → execute (simulated unless the gate is open)</span>
+<span class="c-k">const</span> quote = <span class="c-k">await</span> solard.<span class="c-f">quoteBuy</span>(feed[<span class="c-n">0</span>].mint, { sol: <span class="c-n">0.1</span> });
+<span class="c-k">if</span> (quote.priceImpactBps &lt; <span class="c-n">300</span>) {
+  <span class="c-k">await</span> agent.<span class="c-f">buy</span>({ token: feed[<span class="c-n">0</span>].mint, sol: <span class="c-n">0.1</span>, sender: <span class="c-s">"helius"</span> });
+}</pre></div>
+
+  <h3>2 · The CLI — for tool-calling agents</h3>
+  <p>For LLM agents that execute shell tools (Claude Code, custom harnesses), the CLI <i>is</i> the tool set. Every command reads flags, prints structured output, and exits nonzero on failure — exactly what a tool loop wants. A minimal tool manifest:</p>
+  <div class="code"><div class="bar"><span>tools for an LLM agent</span></div>
+<pre>solard tokens                       <span class="c-c"># list what's registered</span>
+solard price <span class="c-s">&lt;token&gt;</span>                <span class="c-c"># current venue price</span>
+solard quote buy <span class="c-s">&lt;token&gt;</span> --sol X    <span class="c-c"># read-only quote</span>
+solard buy ... --simulate-only      <span class="c-c"># full dry-run with balance deltas</span>
+solard buy ...                      <span class="c-c"># only works if the gate is open</span>
+solard history                      <span class="c-c"># what happened</span></pre></div>
+  <div class="note"><b>Recommended agent posture:</b> give the agent <code>quote</code>, <code>price</code>, and <code>--simulate-only</code> freely; require human confirmation (or a size-capped agent wallet) for anything live. The <code>weight_bps</code> on group membership and a dedicated low-balance agent wallet are your blast-radius controls.</div>
+
+  <h3>3 · The HTTP API — for anything else</h3>
+  <p>Python agents, remote orchestrators, anything that speaks HTTP — the console's API is a complete surface. See <a href="#api" class="grn">the endpoint list</a>. Authenticate with <code>x-solard-web-token</code> when the token is set.</p>
+  <div class="code"><div class="bar"><span>python</span></div>
+<pre><span class="c-k">import</span> requests
+
+S = <span class="c-s">"http://localhost:3000"</span>
+H = {<span class="c-s">"x-solard-web-token"</span>: token}
+
+feed  = requests.get(f<span class="c-s">"{S}/api/terminal/feed"</span>, headers=H).json()
+quote = requests.post(f<span class="c-s">"{S}/api/trade/buy"</span>, headers=H, json={
+    <span class="c-s">"token"</span>: feed[<span class="c-s">"data"</span>][<span class="c-n">0</span>][<span class="c-s">"mint"</span>],
+    <span class="c-s">"wallet"</span>: <span class="c-s">"agent-hot"</span>,
+    <span class="c-s">"sol"</span>: <span class="c-n">0.1</span>,
+    <span class="c-s">"live"</span>: <span class="c-k">False</span>,          <span class="c-c"># simulation; live=True requires the env gate</span>
+}).json()</pre></div>
+</section>
+
+<!-- API -->
+<section id="api">
+  <h2><span class="hash">#</span>HTTP API</h2>
+  <p>All routes are served by the console server. Responses use a uniform envelope: <code>{ ok, data }</code> on success, <code>{ ok: false, error: { code, message } }</code> on failure.</p>
+  <table>
+    <tr><th>route</th><th>method</th><th>purpose</th></tr>
+    <tr><td>/api/status</td><td>GET</td><td>Server + gate status, versions, db path.</td></tr>
+    <tr><td>/api/health · /api/terminal/health</td><td>GET</td><td>Worker fleet health with staleness per stream.</td></tr>
+    <tr><td>/api/terminal/doctor</td><td>GET</td><td>Deep feed diagnosis — which source is stale, last event per feed.</td></tr>
+    <tr><td>/api/terminal/feed · /api/pump-live</td><td>GET</td><td>Live pump feed: creates, trades, curve progress.</td></tr>
+    <tr><td>/api/terminal/trades</td><td>GET</td><td>Trade stream for a mint.</td></tr>
+    <tr><td>/api/terminal/curve</td><td>GET</td><td>Bonding-curve snapshots for a mint.</td></tr>
+    <tr><td>/api/terminal/holders · /api/token-holders</td><td>GET</td><td>Holder distribution series (the terminal chart's data).</td></tr>
+    <tr><td>/api/market/sma</td><td>GET</td><td>SMA indicator values.</td></tr>
+    <tr><td>/api/price</td><td>GET</td><td>Venue price for a registered token.</td></tr>
+    <tr><td>/api/portfolio · /api/overview</td><td>GET</td><td>Positions, balances, PnL across wallets/groups.</td></tr>
+    <tr><td>/api/wallets/import</td><td>POST</td><td>Import a wallet (encrypted at rest).</td></tr>
+    <tr><td>/api/groups/create · /api/groups/add</td><td>POST</td><td>Group management.</td></tr>
+    <tr><td>/api/trade/buy · /api/trade/sell</td><td>POST</td><td>Execute or simulate a trade; <b>live:true</b> rejected unless the gate is open.</td></tr>
+    <tr><td>/api/launch/pump</td><td>POST</td><td>Start a launch job; poll <b>/api/jobs</b> for progress.</td></tr>
+    <tr><td>/api/signals · /api/terminal/signals</td><td>GET</td><td>Telegram signal projections.</td></tr>
+    <tr><td>/api/processes · /api/workers/ensure</td><td>GET/POST</td><td>Inspect and (re)start the worker fleet.</td></tr>
+  </table>
+</section>
+
+<!-- ENV -->
+<section id="env">
+  <h2><span class="hash">#</span>Environment</h2>
+  <table>
+    <tr><th>variable</th><th>default</th><th>meaning</th></tr>
+    <tr><td>SOLARD_DB_PATH</td><td>./solard.db</td><td>The shared SQLite database — wallets, tokens, feed, everything.</td></tr>
+    <tr><td>SOLARD_MASTER_KEY</td><td>—</td><td><b>Required to import/decrypt wallets.</b> Lose it and stored keys are unrecoverable.</td></tr>
+    <tr><td>HELIUS_RPC_URL</td><td>—</td><td>Primary RPC. <code>RPC_ENDPOINT</code> accepted for compatibility.</td></tr>
+    <tr><td>HELIUS_API_KEY</td><td>—</td><td>Used to derive the websocket URL for stream workers.</td></tr>
+    <tr><td>HELIUS_SENDER_URL</td><td>—</td><td>Helius Sender fast-lane endpoint (regional or global).</td></tr>
+    <tr><td>HELIUS_TIP_ACCOUNT</td><td>—</td><td>Tip account for Sender submissions.</td></tr>
+    <tr><td>JITO_BLOCK_ENGINE_URL</td><td>mainnet.block-engine.jito.wtf</td><td>Only when explicitly selecting the jito sender.</td></tr>
+    <tr><td>SOLARD_ENABLE_LIVE_TRADES</td><td><b>0</b></td><td>The live gate. Everything is simulation until this is 1.</td></tr>
+    <tr><td>SOLARD_WEB_TOKEN</td><td>—</td><td>When set, all console/API calls must send <code>x-solard-web-token</code>.</td></tr>
+    <tr><td>SOLARD_PUMP_FEED_SOURCE</td><td>helius</td><td>Primary feed source for the terminal.</td></tr>
+    <tr><td>PUMP_METADATA_PROVIDER</td><td>pump-frontend</td><td>IPFS provider for launch metadata; <code>pinata</code> needs <code>PINATA_JWT</code>.</td></tr>
+    <tr><td>SOLARD_LOG_LEVEL</td><td>info</td><td>measure-fn log verbosity.</td></tr>
+    <tr><td>SOLARD_MAX_JOBS</td><td>100</td><td>Background job retention (launches).</td></tr>
+    <tr><td>SOLARD_METADATA_CIRCUIT_*</td><td>5 / 60000 / 10000</td><td>Metadata-repair circuit breaker: failures to open, open ms, half-open retry ms.</td></tr>
+  </table>
+</section>
+
+<!-- SAFETY -->
+<section id="safety">
+  <h2><span class="hash">#</span>Safety model</h2>
+  <p>Solard assumes you will eventually connect something impulsive to it — a 4am you, or an agent. The defaults are built for that.</p>
+  <ul class="plain">
+    <li><b>Dry-run by default.</b> <code>SOLARD_ENABLE_LIVE_TRADES=0</code> ships in <code>.env.example</code>. Live buy, sell, and launch — CLI, console, and API alike — reject <code>live=true</code> until you flip it. Simulation runs the entire pipeline and reports balance deltas.</li>
+    <li><b>Keys encrypted at rest.</b> Wallet secrets are encrypted with <code>SOLARD_MASTER_KEY</code> before touching disk. The key itself lives only in your environment.</li>
+    <li><b>Simulate anything.</b> <code>--simulate-only</code> works on every trade path including group bundles, printing compute and slippage before you commit.</li>
+    <li><b>Blast-radius controls for agents.</b> Dedicated low-balance agent wallets, per-wallet <code>weight_bps</code> in groups, and per-agent config caps.</li>
+    <li><b>Local by default.</b> The console binds localhost. Widening it is an explicit flag, and a token gate exists for when you do.</li>
+    <li><b>Everything attributable.</b> Every execution is logged with its origin (CLI, console, script, agent) and its full measure-fn trace on <code>/activity</code>.</li>
+  </ul>
+  <div class="note"><b>Not financial advice.</b> Solard is execution infrastructure. Memecoin markets are adversarial; simulate first, size for loss, and read the code — that's why it's open.</div>
+</section>
+
+</article>
+</div>
+
+<footer>
+  <div class="wrap foot">
+    <div>◧ SOLARD /docs</div>
+    <div><a href="./solard-landing.html">home</a> · <a href="https://github.com/7flash/solard">github</a></div>
+  </div>
+</footer>
+
+<script>
+// copy buttons
+document.querySelectorAll('.code button[data-c]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const t=b.dataset.c||b.closest('.code').querySelector('pre').textContent;
+    navigator.clipboard.writeText(t);
+    b.textContent='copied';setTimeout(()=>b.textContent='copy',1200);
+  });
+});
+// sidebar scrollspy
+(function(){
+  const links=[...document.querySelectorAll('#side a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const io=new IntersectionObserver(es=>{
+    es.forEach(e=>{
+      if(e.isIntersecting){
+        links.forEach(a=>a.classList.remove('on'));
+        const a=map.get(e.target.id);if(a)a.classList.add('on');
+      }
+    });
+  },{rootMargin:'-15% 0px -75% 0px'});
+  document.querySelectorAll('article section[id]').forEach(s=>io.observe(s));
+})();
+</script>
+</body>
+</html>

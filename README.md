@@ -1,42 +1,114 @@
-# SOLARD landing + docs — TradJS
+# SOLARD web and terminal guide
 
-A complete TradJS rebuild of the supplied SOLARD landing and documentation pages. The project uses TradJS file-system routing and server-rendered JSX, plus explicit `tradjs/client` route mounts for browser behavior. There is no React dependency.
+This package contains the TradJS landing page, documentation, and browser routes for [SOLARD](https://github.com/7flash/solard).
 
-`tsconfig.json` uses TypeScript's `react-jsx` transform mode only to enable automatic JSX compilation; `jsxImportSource` points the runtime to `tradjs/client`.
+The important startup distinction is simple:
 
-## Run
+- `bun run indexer/main.ts` starts market ingestion and writes local state.
+- `bunx tradjs server` serves the browser terminal and documentation.
+- `sowl` is the CLI. It is not the terminal launcher.
+
+## Run the full SOLARD terminal
+
+Run these commands from the root of the actual SOLARD repository.
+
+### 1. Install and configure
+
+```bash
+git clone https://github.com/7flash/solard
+cd solard
+bun install
+cp .env.example .env
+```
+
+Configure the required RPC and wallet-encryption settings in `.env`. Keep live execution disabled while testing:
+
+```env
+SOLARD_ENABLE_LIVE_TRADES=0
+```
+
+### 2. Start the indexer
+
+Open the first shell and leave it running:
+
+```bash
+bun run indexer/main.ts
+```
+
+The indexer owns ingestion and updates the SQLite-backed market state used by the terminal.
+
+### 3. Start the TradJS server
+
+Open a second shell in the same repository:
+
+```bash
+export BUN_PORT=3000
+bunx tradjs server
+```
+
+Then open `http://localhost:3000`.
+
+PowerShell:
+
+```powershell
+$env:BUN_PORT = "3000"
+bunx tradjs server
+```
+
+Starting only TradJS serves the interface, but current indexed data requires the indexer process to be running too.
+
+## CLI
+
+The CLI is a separate operator interface:
+
+```bash
+sowl help
+```
+
+Use it for repeatable wallet, token, quote, trade, launch, worker, watch, and script workflows. Begin with simulations and keep `SOLARD_ENABLE_LIVE_TRADES=0` until the complete path has been reviewed.
+
+## Web routes
+
+- `/` — landing page
+- `/docs` — searchable documentation
+- `/terminal` — terminal interface
+- `/api/dexscreener` — normalized DEX pair data
+- `/api/token-stream` — terminal event stream
+
+## Project structure
+
+```text
+app/
+  page.tsx                 landing page
+  docs/                    documentation route
+  terminal/                browser terminal
+  api/                     server routes
+  lib/                     market-data helpers
+scripts/
+  dev.ts                   local wrapper used by this standalone web package
+```
+
+## Standalone web-layer development
+
+This ZIP is a web-layer package and does not include the upstream repository's `indexer/` implementation. To work only on the pages in this package, install dependencies and start TradJS directly:
 
 ```bash
 bun install
-bun run dev
+export BUN_PORT=3000
+bunx tradjs server
 ```
 
-Open `http://localhost:3000`.
+For the actual terminal with advancing market state, place/use the web layer in the complete SOLARD repository and run both processes described above.
 
-## Routes
+## Production notes
 
-- `/` — marketing landing
-- `/docs` — full documentation page with sticky navigation, scrollspy, copyable command blocks, tables, callouts, and route-specific metadata
-- `/terminal` — interactive sample terminal
+- Keep the terminal bound to localhost unless remote access is protected.
+- Use a VPN or SSH tunnel instead of exposing the operator interface directly.
+- Configure a dedicated Solana/Helius RPC for reliable indexing.
+- Preserve long-lived HTTP connections if `/api/token-stream` is proxied.
+- Back up the SQLite database and protect `SOLARD_MASTER_KEY`.
+- Review simulations, wallet selection, slippage, priority fees, and sender configuration before enabling live execution.
 
-## Production build
+## License
 
-```bash
-bun run build
-```
-
-## Structure
-
-- `app/layout.tsx` — shared document shell, favicon, and font links
-- `app/page.tsx` — server-rendered landing and landing metadata
-- `app/page.client.tsx` — ticker, calculator, copy controls, boot feed, reveal observers, and holder chart
-- `app/docs/page.tsx` — server-rendered documentation route and docs metadata
-- `app/docs/content.ts` — trusted static docs markup derived from the supplied mockup
-- `app/docs/page.client.tsx` — code-copy controls and sidebar scrollspy
-- `app/terminal/page.tsx` + `page.client.tsx` — interactive sample terminal route
-- `app/globals.css` — shared landing styles plus route-scoped docs and terminal styles
-- `scripts/dev.ts` — explicit TradJS server startup on `PORT` or `3000`
-- `reference/original-landing.html` — supplied landing source retained for comparison
-- `reference/original-docs.html` — supplied docs source retained for comparison
-
-TradJS is pinned to `4.2.0` for reproducible installs.
+Follow the license and notices in the upstream SOLARD repository.

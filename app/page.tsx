@@ -2,632 +2,374 @@ import { Head } from "tradjs/web";
 
 export const ssg = true;
 
+const Mark = ({ size = 18, className = "mark" }: { size?: number; className?: string }) => (
+  <svg className={className} width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
+    <path d="M10.5 4h16l-3.4 5h-16z" />
+    <path d="M7.1 13.5h16l3.4 5h-16z" />
+    <path d="M10.5 23h16l-3.4 5h-16z" />
+  </svg>
+);
+
+const CheckList = ({ items }: { items: string[] }) => (
+  <ul className="v3-check-list">
+    {items.map((item) => <li key={item}>{item}</li>)}
+  </ul>
+);
+
 export default function HomePage() {
+  const install = [
+    "git clone https://github.com/7flash/solard",
+    "cd solard",
+    "bun install",
+    "cp .env.example .env",
+    "",
+    "# terminal 1 — index market data",
+    "bun run indexer/main.ts",
+    "",
+    "# terminal 2 — serve the TradJS terminal",
+    "export BUN_PORT=3000",
+    "bunx tradjs server",
+  ].join("\n");
+
   return (
     <>
       <Head>
-        <title>SOLARD — trading terminal</title>
+        <title>SOLARD — local-first Solana execution infrastructure</title>
         <meta
           name="description"
-          content="Local-first Solana trading terminal and multi-wallet CLI/SDK. Direct venue transactions, no Jupiter, no platform fees."
+          content="SOLARD is an open-source, local-first execution stack for Pump, PumpSwap, and Solana-native workflows. Discover markets, manage wallets, simulate transactions, automate strategies, and submit through RPC, Helius, or Jito."
         />
-        <meta property="og:title" content="SOLARD — trading terminal" />
+        <meta property="og:title" content="SOLARD — Solana trading infrastructure that runs on your machine" />
         <meta
           property="og:description"
-          content="Runs on your machine. Your keys, your RPC, direct venue transactions, 0% platform fees."
+          content="Open-source, self-hosted Solana execution infrastructure with a TradJS terminal, Sowl CLI, TypeScript SDK, local SQLite state, and no SOLARD application trading fee."
         />
       </Head>
-      <div>
-        <header>
+
+      <div className="landing-v3">
+        <header className="v3-header">
           <div className="wrap">
-            <nav>
-              <a className="brand" href="#">
-                <svg
-                  className="mark"
-                  width={18}
-                  height={18}
-                  viewBox="0 0 32 32"
-                  aria-hidden="true"
-                >
-                  <path d="M10.5 4h16l-3.4 5h-16z" />
-                  <path d="M7.1 13.5h16l3.4 5h-16z" />
-                  <path d="M10.5 23h16l-3.4 5h-16z" />
-                </svg>
-                <span className="wm">SOLARD</span>
+            <nav className="v3-nav" aria-label="Primary navigation">
+              <a className="v3-brand" href="#top" aria-label="SOLARD home">
+                <Mark />
+                <span>SOLARD</span>
               </a>
-              <div className="nav-links">
-                <a href="#fees" data-s="fees">
-                  fees
-                </a>
-                <a href="#features" data-s="features">
-                  features
-                </a>
-                <a href="#terminal" data-s="terminal">
-                  terminal
-                </a>
-                <a className="docs" href="/docs">
-                  docs
-                </a>
-                <a className="gh" href="https://github.com/7flash/solard">
-                  github
-                </a>
-                <a className="act" href="#get">
-                  run →
-                </a>
+              <div className="v3-nav-links">
+                <a href="#execution" data-s="execution">Execution</a>
+                <a href="#architecture" data-s="architecture">Architecture</a>
+                <a href="#developers" data-s="developers">Developers</a>
+                <a href="/docs">Docs</a>
+                <a href="https://github.com/7flash/solard" target="_blank" rel="noreferrer">GitHub</a>
+                <a className="v3-nav-cta" href="/docs">View Docs →</a>
               </div>
             </nav>
           </div>
         </header>
-        {/* live ticker */}
-        <div className="ticker" aria-hidden="true">
-          <div className="rail" id="ticker-root" />
-        </div>
-        <main>
-          {/* HERO */}
-          <section className="hero">
+
+        <main id="top">
+          <section className="v3-hero">
             <div className="wrap">
-              <div className="hero-grid">
-                <div>
-                  <div className="tag">
-                    open source · runs locally · solana mainnet
-                  </div>
-                  <div className="lockup">
-                    <svg
-                      className="mark"
-                      width={58}
-                      height={58}
-                      viewBox="0 0 32 32"
-                      aria-hidden="true"
-                    >
-                      <path d="M10.5 4h16l-3.4 5h-16z" />
-                      <path d="M7.1 13.5h16l3.4 5h-16z" />
-                      <path d="M10.5 23h16l-3.4 5h-16z" />
-                    </svg>
-                    <h1 id="wordmark" data-text="SOLARD">
-                      SOLARD
-                    </h1>
-                  </div>
-                  <div className="sub">
-                    Trading Terminal <span className="cursor">_</span>
-                  </div>
-                  <p>
-                    A local-first Solana terminal and multi-wallet CLI/SDK for
-                    memecoin traders and AI agents. Direct venue transactions —
-                    pump.fun curve and PumpSwap AMM instructions built by hand,
-                    no Jupiter, no middleman clipping your fills. Keys live
-                    encrypted in a local SQLite database, and every line that
-                    touches them is on GitHub. You pay network fees and tips.{" "}
-                    <b>Nothing else, to no one.</b>
+              <div className="v3-hero-grid">
+                <div className="v3-hero-copy rv">
+                  <div className="v3-eyebrow">open source · self-hosted · solana mainnet</div>
+                  <h1>Solana trading infrastructure that runs on your machine.</h1>
+                  <p className="v3-lede">
+                    SOLARD is an open-source execution terminal for Pump, PumpSwap, and Solana-native workflows.
                   </p>
-                  <div className="cmd">
-                    <div className="ln">
-                      <span className="p">$</span>
-                      <span className="c">
-                        git clone https://github.com/7flash/solard
-                      </span>
-                    </div>
-                    <div className="ln">
-                      <span className="p">$</span>
-                      <span className="c">
-                        cd solard &amp;&amp; bun install
-                      </span>
-                    </div>
-                    <div className="ln">
-                      <span className="p">$</span>
-                      <span className="c">bun bin/solard.ts start --open</span>
-                    </div>
-                    <button data-copy="git clone https://github.com/7flash/solard && cd solard && bun install && bun bin/solard.ts start --open">
-                      copy
-                    </button>
+                  <p>
+                    Manage wallets, inspect markets, preview transactions, automate strategies, and submit through RPC, Helius, or Jito—all from one local stack.
+                  </p>
+                  <div className="v3-actions">
+                    <a className="v3-button primary" href="/docs">View Documentation</a>
+                    <a className="v3-button secondary" href="https://github.com/7flash/solard" target="_blank" rel="noreferrer">GitHub ↗</a>
                   </div>
-                  <div className="alt">
-                    or drive it headless: <a href="/docs#cli">solard help</a> ·{" "}
-                    <a href="/docs">read the docs</a>
-                  </div>
+                  <div className="v3-trust-line"><i>●</i> Local-first. Open source. No application trading fee.</div>
                 </div>
-                <div className="boot" aria-hidden="true">
-                  <div className="tbar">
-                    <span className="dot" />
-                    <span className="dot" />
-                    <span className="dot" />
-                    <span>solard start</span>
-                    <span className="live">live</span>
-                  </div>
-                  <pre id="boot" />
+
+                <div className="v3-command cmd rv" aria-label="SOLARD install commands">
+                  <div className="v3-command-head"><span>quickstart.sh</span><span>local</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">git clone https://github.com/7flash/solard</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">cd solard && bun install</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">cp .env.example .env</span></div>
+                  <div className="ln note"><span className="p">#</span><span className="c">terminal 1 — index market data</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">bun run indexer/main.ts</span></div>
+                  <div className="ln note"><span className="p">#</span><span className="c">terminal 2 — serve the UI</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">export BUN_PORT=3000</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">bunx tradjs server</span></div>
+                  <button data-copy={install}>copy</button>
+                  <div className="v3-command-foot"><span>two long-running processes</span><span>simulation first</span></div>
                 </div>
               </div>
             </div>
           </section>
-          {/* META */}
-          <div className="wrap rv">
-            <div className="meta">
-              <div className="cell">
-                <div className="v">0%</div>
-                <div className="k">platform fee, forever</div>
-              </div>
-              <div className="cell">
-                <div className="v">DRY-RUN</div>
-                <div className="k">live trades gated by default</div>
-              </div>
-              <div className="cell">
-                <div className="v">SQLITE</div>
-                <div className="k">encrypted local persistence</div>
-              </div>
-              <div className="cell">
-                <div className="v">LOCAL</div>
-                <div className="k">your RPC, your keys</div>
-              </div>
-            </div>
-          </div>
-          {/* FEES */}
-          <section className="blk" id="fees">
-            <span className="idx">01</span>
+
+          <section className="v3-summary v3-section">
             <div className="wrap rv">
-              <div className="tag">fees</div>
-              <h2>The middleman, removed.</h2>
-              <div className="fee-hero">
-                <span className="zero">0%</span>
-                <span className="vs">
-                  hosted bots clip <b>~1% of every trade</b>. solard assembles
-                  transactions locally and submits through your own RPC, Helius
-                  Sender, or Jito. network fees and tips are the entire cost.
-                </span>
-              </div>
-              <div className="fees">
-                <div className="col us">
-                  <div className="who">solard · local</div>
-                  <ul>
-                    <li>keys never leave your machine</li>
-                    <li>your own RPC endpoint + rate limits</li>
-                    <li>every line auditable on GitHub</li>
-                    <li>no account, no server, no custody</li>
-                  </ul>
+              <div className="v3-summary-grid">
+                <div className="v3-section-heading">
+                  <span className="v3-kicker">product summary</span>
+                  <h2>One stack from market signal to signed transaction.</h2>
                 </div>
-                <div className="col them">
-                  <div className="who">hosted terminals · ~1%</div>
-                  <ul>
-                    <li>$1,000 per $100k of volume</li>
-                    <li>keys or approvals on their servers</li>
-                    <li>shared infra + rate limits</li>
-                    <li>closed source</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="calc" id="fee-calculator-root">
-                <label for="vol">your monthly volume</label>
-                <input
-                  type="range"
-                  id="vol"
-                  min={10}
-                  max={1000}
-                  step={10}
-                  value={100}
-                />
-                <div className="out">
-                  at <b>$100k</b>/mo, a 1% bot costs <b>$12,000</b>/yr ·{" "}
-                  <span className="grn">solard: $0</span>
+                <div className="v3-summary-copy">
+                  <p>SOLARD connects market data, local wallet state, venue routing, transaction construction, simulation, and submission.</p>
+                  <p>The browser terminal, CLI, SDK, scripts, and background workers all operate on the same execution engine and shared local database.</p>
+                  <div className="v3-negatives">
+                    <span>No hosted trading account.</span>
+                    <span>No separate automation platform.</span>
+                    <span>No black-box transaction builder.</span>
+                  </div>
+                  <p className="v3-emphasis">Your strategies and keys remain under your control.</p>
                 </div>
               </div>
             </div>
           </section>
-          <div className="marq" aria-hidden="true">
-            <div className="rail">
-              <span>
-                zero platform fees <i>◆</i> your keys, your RPC <i>◆</i> direct
-                venue transactions <i>◆</i> no jupiter <i>◆</i> dry-run by
-                default <i>◆</i>
-              </span>
-              <span>
-                zero platform fees <i>◆</i> your keys, your RPC <i>◆</i> direct
-                venue transactions <i>◆</i> no jupiter <i>◆</i> dry-run by
-                default <i>◆</i>
-              </span>
-            </div>
-          </div>
-          {/* FEATURES */}
-          <section className="blk" id="features">
-            <span className="idx">02</span>
+
+          <section className="v3-section v3-core" id="core">
             <div className="wrap rv">
-              <div className="tag">capabilities</div>
-              <h2>One terminal, the whole pipeline.</h2>
-              <div className="rows feature-rows">
-                <a className="row" href="/docs#venues">
-                  <span className="n">01</span>
-                  <span className="h">direct venue execution</span>
-                  <span className="d">
-                    Pump.fun bonding curve and PumpSwap AMM instructions
-                    constructed manually with a route resolver between them.
-                    Send via <code>rpc</code>, <code>helius</code> Sender fast
-                    lane, or <code>jito</code> — with{" "}
-                    <code>--simulate-only</code> on every trade.
-                  </span>
-                  <span className="ar">→</span>
-                </a>
-                <a className="row" href="/docs#cli">
-                  <span className="n">02</span>
-                  <span className="h">multi-wallet groups</span>
-                  <span className="d">
-                    Import wallets encrypted at rest under{" "}
-                    <code>SOLARD_MASTER_KEY</code>, organize them into weighted
-                    groups, then{" "}
-                    <code>solard buy --group snipers --sender jito</code>{" "}
-                    submits the whole group as Jito bundles, five transactions
-                    per bundle.
-                  </span>
-                  <span className="ar">→</span>
-                </a>
-                <a className="row" href="/docs#web">
-                  <span className="n">03</span>
-                  <span className="h">live pump terminal</span>
-                  <span className="d">
-                    A web console over a supervised worker fleet: Helius logs +
-                    LaserStream and PumpPortal streams, bonding-curve snapshots,
-                    holder snapshots, SMA indicators, a reconciler, and a live
-                    doctor that tells you which feed is lying.
-                  </span>
-                  <span className="ar">→</span>
-                </a>
-                <a className="row" href="/docs#launch">
-                  <span className="n">04</span>
-                  <span className="h">token launching</span>
-                  <span className="d">
-                    <code>solard launch pump</code> — metadata via pump frontend
-                    or Pinata, vanity mint grinding, coordinated buyer groups,
-                    ALT prep, and submit modes from{" "}
-                    <code>after-deploy-processed</code> to{" "}
-                    <code>fast-spam</code>.
-                  </span>
-                  <span className="ar">→</span>
-                </a>
-                <a className="row" href="/docs#scripts">
-                  <span className="n">05</span>
-                  <span className="h">scripts &amp; workflows</span>
-                  <span className="d">
-                    Strategies stay outside the kernel: register plain
-                    TypeScript in <code>solard.config.ts</code> and{" "}
-                    <code>solard run</code> it. Venue-agnostic workflows ship in
-                    the box — snipe, claim→trade→send, wait-launch-trade-group.
-                  </span>
-                  <span className="ar">→</span>
-                </a>
-                <a className="row" href="/docs#agents">
-                  <span className="n">06</span>
-                  <span className="h">built for agents</span>
-                  <span className="d">
-                    Three integration surfaces for AI agents: the typed SDK from
-                    any Bun process, the CLI as tool calls, and a local HTTP API
-                    guarded by a web token. Agent registry, watchlists,
-                    creator-fee claiming.
-                  </span>
-                  <span className="ar">→</span>
-                </a>
+              <div className="v3-section-heading centered">
+                <span className="v3-kicker">core value</span>
+                <h2>Your machine is the execution stack.</h2>
+                <p>SOLARD keeps the important parts of trading infrastructure close to the operator.</p>
               </div>
-              <div className="safety">
-                <span className="flag">SOLARD_ENABLE_LIVE_TRADES=0</span>
-                <p>
-                  Safe by default. Live buy, sell, and launch routes reject{" "}
-                  <b>live=true</b> until you explicitly flip the gate — the
-                  console can't spend real SOL because you clicked the wrong
-                  button at 4am.
-                </p>
+              <div className="v3-feature-grid">
+                {[
+                  ["01", "Local wallet control", "Import and organize wallets without handing execution authority to a hosted trading platform."],
+                  ["02", "Local transaction construction", "Instructions are built and signed locally before they are submitted to the network."],
+                  ["03", "Shared state", "Wallets, groups, tokens, prices, executions, jobs, and watchlists live in one SQLite database."],
+                  ["04", "Explicit live gate", "Simulation and planning are the default. Live execution must be deliberately enabled."],
+                  ["05", "Flexible submission", "Route transactions through standard RPC, Helius Sender, or Jito according to the operation."],
+                  ["06", "Zero SOLARD application fee", "SOLARD does not add a percentage fee to trades. Network, venue, priority, RPC, and optional sender costs still apply."],
+                ].map(([n, title, body]) => (
+                  <article className="v3-feature-card" key={n}>
+                    <span>{n}</span><h3>{title}</h3><p>{body}</p>
+                  </article>
+                ))}
               </div>
             </div>
           </section>
-          {/* TERMINAL */}
-          <section className="blk rule" id="terminal">
-            <span className="idx">03</span>
+
+          <section className="v3-section v3-execution" id="execution">
             <div className="wrap rv">
-              <div className="tag">terminal</div>
-              <h2>Streams in, SQLite in the middle, everything reads local.</h2>
-              <p>
-                Independent stream workers write normalized events into one
-                local database. The console, the CLI, and your scripts all read
-                the same tables — no worker talks to another, and if one dies,
-                bgrun's staleness detection and the reconciler know before you
-                do. Every hop is traced with measure-fn.
-              </p>
-              <div className="arch">
-                <div className="stage">
-                  <div className="st">streams</div>
-                  <div className="it">
-                    <i>●</i>helius-logs
-                  </div>
-                  <div className="it">
-                    <i>●</i>helius-laserstream
-                  </div>
-                  <div className="it">
-                    <i>●</i>pumpportal-live
-                  </div>
-                  <div className="it">
-                    <i>●</i>curve-snapshots
-                  </div>
-                  <div className="it">
-                    <i>●</i>holder-snapshots
-                  </div>
-                </div>
-                <div className="flow">──▶</div>
-                <div className="stage core">
-                  <div className="st">solard.db</div>
-                  <div className="it">tokens · trades · holders</div>
-                  <div className="it">indicators · signals</div>
-                  <div className="it">wallets (encrypted)</div>
-                  <div className="it">reconciler · doctor</div>
-                </div>
-                <div className="flow">──▶</div>
-                <div className="stage">
-                  <div className="st">surfaces</div>
-                  <div className="it">web console</div>
-                  <div className="it">solard CLI</div>
-                  <div className="it">SDK · scripts · agents</div>
-                  <div className="it">telegram signals</div>
-                </div>
+              <div className="v3-section-heading split">
+                <div><span className="v3-kicker">execution</span><h2>Build locally. Inspect first. Submit deliberately.</h2></div>
+                <p>SOLARD resolves the market, constructs the required instructions, estimates execution parameters, and presents the transaction before it is sent.</p>
               </div>
-              <p className="arch-sub">
-                plus <code>metadata-repair</code> with a circuit breaker, and a{" "}
-                <code>live doctor</code> endpoint that probes every feed and
-                reports which one is stale.
-              </p>
-              <div className="dist">
-                <div className="lead">holder distribution over time</div>
-                <p>
-                  The holder-snapshot worker samples largest accounts
-                  continuously; the terminal draws every holder as one line.
-                  Vertical is share of supply, horizontal is time. Whales
-                  flatten near the cap, accumulators climb, distributors bleed
-                  out, fresh wallets appear mid-chart. Concentration is visible
-                  before it moves the price.
-                </p>
-                <div className="mini">
-                  <canvas id="mini" />
-                  <div className="tip" id="tip" />
-                </div>
-                <div className="hint">
-                  hover to isolate a wallet · sample data
-                </div>
-                <a className="launch" href="/terminal">
-                  launch the distribution terminal →
-                </a>
+              <div className="v3-step-list">
+                {[
+                  ["01", "Resolve the venue", "One routing layer handles Pump bonding curves and PumpSwap pools."],
+                  ["02", "Build the transaction", "Accounts, instructions, token programs, slippage limits, compute budgets, and signers are assembled locally."],
+                  ["03", "Simulate", "Inspect expected behavior before opening the live execution gate."],
+                  ["04", "Choose the sender", "Submit through RPC, Helius, or Jito based on speed, privacy, ordering, and bundle requirements."],
+                  ["05", "Record the result", "Execution status and market activity are written back into local state for later review."],
+                ].map(([n, title, body]) => (
+                  <article className="v3-step" key={n}>
+                    <span>{n}</span><div><h3>{title}</h3><p>{body}</p></div>
+                  </article>
+                ))}
+              </div>
+              <a className="v3-text-link" href="/docs#venues">Explore Execution Details →</a>
+            </div>
+          </section>
+
+          <section className="v3-section v3-interfaces" id="developers">
+            <div className="wrap rv">
+              <div className="v3-section-heading centered">
+                <span className="v3-kicker">operator interfaces</span>
+                <h2>One engine. Three ways to operate it.</h2>
+              </div>
+              <div className="v3-interface-stack">
+                <article className="v3-interface-card">
+                  <div className="v3-interface-copy">
+                    <span className="v3-number">01</span><h3>TradJS Terminal</h3>
+                    <p>Use the browser interface for monitoring and operational control.</p>
+                    <CheckList items={["Market monitoring", "Wallet and group management", "Portfolio visibility", "Trade previews", "Launch workflows", "Execution history", "Worker and process status"]} />
+                    <a className="v3-text-link" href="/docs#web">Read Console Guide →</a>
+                  </div>
+                  <div className="v3-route-box"><span>routes</span><code>/terminal</code><code>/portfolio</code><code>/trade</code><code>/launch</code></div>
+                </article>
+
+                <article className="v3-interface-card">
+                  <div className="v3-interface-copy">
+                    <span className="v3-number">02</span><h3>Sowl CLI</h3>
+                    <p>Use the command line for repeatable operations and shell automation.</p>
+                    <p>The CLI exposes wallet, token, quote, trade, transfer, launch, metadata, worker, watch, and script workflows.</p>
+                    <a className="v3-text-link" href="/docs#cli">Read Command Reference →</a>
+                  </div>
+                  <div className="v3-code-card">
+                    <pre><span>$</span> sowl wallet list{`\n`}<span>$</span> sowl token add &lt;mint&gt;{`\n`}<span>$</span> sowl quote &lt;mint&gt; --sol 0.1{`\n`}<span>$</span> sowl buy &lt;mint&gt; --wallet &lt;wallet&gt; \{`\n   `}--sol 0.1 --simulate-only{`\n`}<span>$</span> sowl run &lt;script&gt; --group &lt;group&gt;</pre>
+                  </div>
+                </article>
+
+                <article className="v3-interface-card">
+                  <div className="v3-interface-copy">
+                    <span className="v3-number">03</span><h3>TypeScript SDK</h3>
+                    <p>Build strategies directly on the same modules used by the terminal and CLI.</p>
+                    <p>Use the SDK for agents, execution services, custom dashboards, launch tools, and automated strategies.</p>
+                    <a className="v3-text-link" href="/docs#scripts">Read SDK Guide →</a>
+                  </div>
+                  <div className="v3-code-card ts">
+                    <pre><span>const</span> quote = <span>await</span> sowl.quote({`{`}{`\n  `}token: mint,{`\n  `}wallet,{`\n  `}side: <b>"buy"</b>,{`\n  `}amountSol: 0.1,{`\n`}{`}`});{`\n\n`}<span>const</span> plan = <span>await</span> sowl.buildTrade(quote);{`\n`}<span>const</span> simulation = <span>await</span> sowl.simulatePlan(plan);</pre>
+                  </div>
+                </article>
               </div>
             </div>
           </section>
-          <div className="marq" aria-hidden="true">
-            <div className="rail">
-              <span>
-                pump.fun curve <i>◆</i> pumpswap amm <i>◆</i> jito bundles{" "}
-                <i>◆</i> helius sender <i>◆</i> vanity mints <i>◆</i> holder
-                snapshots <i>◆</i>
-              </span>
-              <span>
-                pump.fun curve <i>◆</i> pumpswap amm <i>◆</i> jito bundles{" "}
-                <i>◆</i> helius sender <i>◆</i> vanity mints <i>◆</i> holder
-                snapshots <i>◆</i>
-              </span>
-            </div>
-          </div>
-          {/* SCRIPTS */}
-          <section className="blk" id="scripts">
-            <span className="idx">04</span>
+
+          <section className="v3-section v3-architecture" id="architecture">
             <div className="wrap rv">
-              <div className="tag">programmable</div>
-              <h2>Your edge, as plain TypeScript.</h2>
-              <p>
-                No DSL, no sandbox, no approval process. Scripts import the SDK;
-                the kernel never imports scripts. Register them once, then run
-                them with wallet, group, and sender flags — simulate first, go
-                live when the numbers agree.
-              </p>
-              <div className="code">
-                <div className="bar">
-                  <span>solard.config.ts</span>
-                  <span style={{ color: "#a06bff" }}>ts</span>
-                </div>
-                <pre>
-                  <span className="c-k">import</span> {"{"} defineSolardConfig{" "}
-                  {"}"} <span className="c-k">from</span>{" "}
-                  <span className="c-s">"solard/runner"</span>;{"\n"}
-                  {"\n"}
-                  <span className="c-k">export default</span>{" "}
-                  <span className="c-f">defineSolardConfig</span>({"{"}
-                  {"\n"}
-                  {"  "}scripts: {"{"}
-                  {"\n"}
-                  {"    "}snipe:{" "}
-                  <span className="c-s">"./scripts/snipe.ts"</span>,{"\n"}
-                  {"    "}
-                  <span className="c-s">"claim-trade-send"</span>: {"{"}
-                  {"\n"}
-                  {"      "}path:{" "}
-                  <span className="c-s">"./scripts/claim-trade-send.ts"</span>,
-                  {"\n"}
-                  {"      "}description:{" "}
-                  <span className="c-s">
-                    "claim creator fees → buy → deliver"
-                  </span>
-                  ,{"\n"}
-                  {"    "}
-                  {"}"},{"\n"}
-                  {"  "}
-                  {"}"},{"\n"}
-                  {"}"});
-                </pre>
+              <div className="v3-section-heading split">
+                <div><span className="v3-kicker">architecture</span><h2>Streams in. Signed transactions out.</h2></div>
+                <p>SOLARD separates data collection, local state, transaction logic, and submission into clear components.</p>
               </div>
-              <div className="code">
-                <div className="bar">
-                  <span>terminal session</span>
-                  <span style={{ color: "var(--faint)" }}>sh</span>
+              <div className="v3-architecture-flow">
+                {[
+                  ["Discover", ["Helius logs", "Market adapters", "DEX enrichment", "Curve snapshots", "Pump + PumpSwap activity", "User watchlists"]],
+                  ["Normalize", ["Token metadata", "Market state", "Price + liquidity", "Wallet balances", "Execution records", "Process health"]],
+                  ["Operate", ["TradJS terminal", "Sowl CLI", "TypeScript SDK", "Scripts + agents", "Launch workflows"]],
+                  ["Execute", ["Solana RPC", "Helius Sender", "Direct Jito", "Atomic ordered bundles"]],
+                ].map(([title, items], index) => (
+                  <article className="v3-architecture-stage" key={title as string}>
+                    <div className="v3-stage-head"><span>0{index + 1}</span><h3>{title as string}</h3></div>
+                    <ul>{(items as string[]).map((item) => <li key={item}>{item}</li>)}</ul>
+                  </article>
+                ))}
+              </div>
+              <p className="v3-architecture-note">All interfaces share the same venue registry, transaction builders, sender adapters, and SQLite-backed state.</p>
+              <a className="v3-text-link" href="/docs#how">View System Architecture →</a>
+            </div>
+          </section>
+
+          <section className="v3-section v3-lifecycle">
+            <div className="wrap rv">
+              <div className="v3-lifecycle-grid">
+                <div>
+                  <span className="v3-kicker">pump + pumpswap</span>
+                  <h2>One execution surface across the token lifecycle.</h2>
+                  <p>A token may begin on a Pump bonding curve and later move into a PumpSwap pool.</p>
+                  <p>SOLARD handles both through one venue-resolution layer.</p>
+                  <p>Strategies do not need separate command structures for every market phase. The resolver identifies the active venue and selects the appropriate account layout and instruction builder.</p>
                 </div>
-                <pre>
-                  <span className="c-c">$</span> solard import{" "}
-                  <span className="c-s">&lt;private_key&gt;</span> dev{"\n"}
-                  <span className="c-c">$</span> solard group create snipers
-                  &amp;&amp; solard group add-many snipers w1,w2,w3{"\n"}
-                  <span className="c-c">$</span> solard buy{" "}
-                  <span className="c-s">&lt;token_ca&gt;</span> --group snipers
-                  --sol <span className="c-n">0.5</span> --sender jito
-                  --simulate-only{"\n"}
-                  <span className="c-c">$</span> solard run snipe --name{" "}
-                  <span className="c-s">"EXACT NAME"</span> --group snipers
-                  --sol <span className="c-n">0.05</span> --sender jito{"\n"}
-                  <span className="c-c">$</span> solard launch pump --creator
-                  dev --image ./logo.png --description{" "}
-                  <span className="c-s">"..."</span> {"\\"}
-                  {"\n"}
-                  {"    "}--buyer-group snipers --submit-mode
-                  spam-after-market-ready --live
-                </pre>
+                <div className="v3-lifecycle-panel">
+                  <div className="v3-lifecycle-path"><span>Pump curve</span><i>→</i><span>PumpSwap pool</span></div>
+                  <h3>Supported workflows</h3>
+                  <CheckList items={["Market inspection", "Buy and sell quoting", "Slippage-controlled execution", "Token launches", "Ordered launch bundles", "Creator-fee workflows", "Transfers and wallet operations", "Automated strategy scripts"]} />
+                </div>
               </div>
             </div>
           </section>
-          {/* DOCS */}
-          <section className="blk rule" id="docsec">
-            <span className="idx">05</span>
+
+          <section className="v3-section v3-programmable">
             <div className="wrap rv">
-              <div className="tag">documentation</div>
-              <h2>Everything is documented.</h2>
-              <div className="docgrid">
-                <a href="/docs#quickstart">
-                  <span className="dh">Quickstart</span>
-                  <span className="dd">
-                    Clone, configure your RPC, boot the console, make your first
-                    simulated trade.
-                  </span>
-                  <span className="dl">read →</span>
-                </a>
-                <a href="/docs#cli">
-                  <span className="dh">CLI reference</span>
-                  <span className="dd">
-                    Wallets, groups, trading, prices, launching, watching, ALTs,
-                    scripts — the full command surface.
-                  </span>
-                  <span className="dl">read →</span>
-                </a>
-                <a href="/docs#web">
-                  <span className="dh">Web console</span>
-                  <span className="dd">
-                    Terminal, trade, portfolio, wallets, watchlists, launch,
-                    signals — and how auth and the live gate work.
-                  </span>
-                  <span className="dl">read →</span>
-                </a>
-                <a href="/docs#venues">
-                  <span className="dh">Venues &amp; routing</span>
-                  <span className="dd">
-                    Pump.fun curve vs PumpSwap AMM, how the route resolver
-                    picks, quotes, slippage, senders.
-                  </span>
-                  <span className="dl">read →</span>
-                </a>
-                <a href="/docs#agents">
-                  <span className="dh">AI agents</span>
-                  <span className="dd">
-                    Give an agent the SDK, the CLI, or the local HTTP API — with
-                    the safety gate still in charge.
-                  </span>
-                  <span className="dl">read →</span>
-                </a>
-                <a href="/docs#env">
-                  <span className="dh">Environment</span>
-                  <span className="dd">
-                    Every variable that changes solard's behavior, from RPC
-                    endpoints to circuit breakers.
-                  </span>
-                  <span className="dl">read →</span>
-                </a>
+              <div className="v3-section-heading split">
+                <div><span className="v3-kicker">programmable automation</span><h2>Keep strategy logic in plain TypeScript.</h2></div>
+                <p>Register a script once, then run it through the same wallet, group, venue, simulation, and sender controls used everywhere else.</p>
+              </div>
+              <div className="v3-code-grid">
+                <div className="v3-code-card large">
+                  <div className="v3-code-label">strategy registry</div>
+                  <pre><span>import</span> {`{ defineSolardConfig }`} <span>from</span> <b>"soler/runner"</b>;{`\n\n`}<span>export default</span> defineSolardConfig({`{`}{`\n  `}scripts: {`{`}{`\n    `}snipe: <b>"./scripts/snipe.ts"</b>,{`\n    `}rebalance: <b>"./scripts/rebalance.ts"</b>,{`\n    `}<b>"claim-trade-send"</b>: <b>"./scripts/claim-trade-send.ts"</b>,{`\n  `}{`}`},{`\n`}{`}`});</pre>
+                </div>
+                <div className="v3-code-card large">
+                  <div className="v3-code-label">terminal</div>
+                  <pre><span>$</span> sowl run snipe \{`\n   `}--group snipers \{`\n   `}--sender jito</pre>
+                  <h3>Strategies can use</h3>
+                  <CheckList items={["Managed wallet groups", "Local market state", "Venue-aware quotes", "Transaction simulation", "RPC, Helius, or Jito submission", "Execution history", "Worker-generated data", "Custom risk controls"]} />
+                </div>
               </div>
             </div>
           </section>
-          {/* GET */}
-          <section className="blk rule" id="get">
-            <span className="idx">06</span>
+
+          <section className="v3-section v3-safety">
             <div className="wrap rv">
-              <div className="tag">get started</div>
-              <h2>Three commands to run it.</h2>
-              <p>
-                Bun, your Helius RPC key, your machine. Every line of what
-                executes your trades is on GitHub.
-              </p>
-              <div className="cmd get-cmd">
-                <div className="ln">
-                  <span className="p">$</span>
-                  <span className="c">
-                    git clone https://github.com/7flash/solard
-                  </span>
+              <div className="v3-safety-grid">
+                <div>
+                  <span className="v3-kicker">safety</span>
+                  <h2>Simulation first. Live execution by explicit choice.</h2>
+                  <p>SOLARD is built for operators who want visibility into what their software is doing.</p>
+                  <p>By default, workflows can be developed and reviewed without live submission.</p>
+                  <div className="v3-env-line"><code>SOLARD_ENABLE_LIVE_TRADES=0</code></div>
+                  <a className="v3-text-link" href="/docs#safety">Read Safety Guide →</a>
                 </div>
-                <div className="ln">
-                  <span className="p">$</span>
-                  <span className="c">cd solard &amp;&amp; bun install</span>
+                <div className="v3-safety-checks">
+                  <h3>Before enabling live trading, verify</h3>
+                  <CheckList items={["Wallet selection", "Position sizing", "SOL reserves", "Slippage limits", "Compute settings", "Priority fees", "Sender configuration", "Bundle tips", "RPC reliability", "Token and market addresses"]} />
+                  <p>Set the live gate only after the complete path has been reviewed.</p>
                 </div>
-                <div className="ln">
-                  <span className="p">$</span>
-                  <span className="c">bun bin/solard.ts start --open</span>
-                </div>
-                <button data-copy="git clone https://github.com/7flash/solard && cd solard && bun install && bun bin/solard.ts start --open">
-                  copy
-                </button>
               </div>
-              <div
-                className="alt"
-                style={{ color: "var(--faint)", fontSize: "12.5px" }}
-              >
-                <a
-                  href="https://github.com/7flash/solard"
-                  style={{
-                    color: "var(--dim)",
-                    textDecoration: "none",
-                    borderBottom: "1px solid var(--line2)",
-                  }}
-                >
-                  github
-                </a>{" "}
-                ·{" "}
-                <a
-                  href="/docs"
-                  style={{
-                    color: "var(--dim)",
-                    textDecoration: "none",
-                    borderBottom: "1px solid var(--line2)",
-                  }}
-                >
-                  documentation
-                </a>{" "}
-                ·{" "}
-                <a
-                  href="https://github.com/7flash/solard/blob/master/.env.example"
-                  style={{
-                    color: "var(--dim)",
-                    textDecoration: "none",
-                    borderBottom: "1px solid var(--line2)",
-                  }}
-                >
-                  .env.example
-                </a>
+            </div>
+          </section>
+
+          <section className="v3-section v3-open-source">
+            <div className="wrap rv">
+              <div className="v3-open-source-panel">
+                <div>
+                  <span className="v3-kicker">open source</span>
+                  <h2>Inspect every layer.</h2>
+                  <p>SOLARD is designed to be read, modified, and self-hosted.</p>
+                  <p>The transaction builders, market adapters, workers, database layer, CLI, and terminal are available in the repository.</p>
+                  <p>Use the complete application or integrate only the pieces your system needs.</p>
+                </div>
+                <a className="v3-button secondary" href="https://github.com/7flash/solard" target="_blank" rel="noreferrer">View on GitHub ↗</a>
+              </div>
+            </div>
+          </section>
+
+          <section className="v3-section v3-quickstart" id="quickstart">
+            <div className="wrap rv">
+              <div className="v3-quickstart-grid">
+                <div>
+                  <span className="v3-kicker">quickstart</span>
+                  <h2>Run SOLARD locally.</h2>
+                  <p>The actual terminal uses two long-running processes: the indexer writes market state, then the TradJS server exposes the interface. Run them in separate shells from the repository root.</p>
+                  <div className="v3-actions compact">
+                    <a className="v3-text-link" href="/docs#quickstart">Read Quickstart →</a>
+                    <a className="v3-text-link" href="/docs#env">Open Configuration Guide →</a>
+                  </div>
+                </div>
+                <div className="v3-command cmd">
+                  <div className="v3-command-head"><span>full terminal</span><span>2 processes</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">git clone https://github.com/7flash/solard</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">cd solard && bun install</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">cp .env.example .env</span></div>
+                  <div className="ln note"><span className="p">#</span><span className="c">terminal 1</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">bun run indexer/main.ts</span></div>
+                  <div className="ln note"><span className="p">#</span><span className="c">terminal 2</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">export BUN_PORT=3000</span></div>
+                  <div className="ln"><span className="p">$</span><span className="c">bunx tradjs server</span></div>
+                  <button data-copy={install}>copy</button>
+                  <div className="v3-command-foot"><span>indexer first</span><span>TradJS second</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="v3-closing">
+            <div className="wrap rv">
+              <div className="v3-closing-panel">
+                <div>
+                  <span className="v3-kicker">run your own stack</span>
+                  <h2>Own the full path from signal to execution.</h2>
+                  <p>Run the terminal locally. Automate through the CLI. Build strategies with the SDK. Submit through the infrastructure you choose.</p>
+                </div>
+                <div className="v3-actions">
+                  <a className="v3-button primary" href="/docs">Read the Docs</a>
+                  <a className="v3-button secondary" href="https://github.com/7flash/solard" target="_blank" rel="noreferrer">GitHub ↗</a>
+                </div>
               </div>
             </div>
           </section>
         </main>
-        <footer>
-          <div className="wrap foot">
-            <div className="fbrand">
-              <svg
-                className="mark grn"
-                width={14}
-                height={14}
-                viewBox="0 0 32 32"
-                aria-hidden="true"
-              >
-                <path d="M10.5 4h16l-3.4 5h-16z" />
-                <path d="M7.1 13.5h16l3.4 5h-16z" />
-                <path d="M10.5 23h16l-3.4 5h-16z" />
-              </svg>
-              <span className="wm">SOLARD</span>
+
+        <footer className="v3-footer">
+          <div className="wrap">
+            <div className="v3-footer-main">
+              <div className="v3-footer-brand"><div><Mark size={16} className="mark grn" /><b>SOLARD</b></div><p>Open-source, local-first Solana execution infrastructure.</p></div>
+              <div className="v3-footer-links">
+                <a href="#execution">Execution</a><a href="#architecture">Architecture</a><a href="#developers">Developers</a><a href="/docs">Documentation</a><a href="https://github.com/7flash/solard">GitHub</a>
+              </div>
             </div>
-            <div className="links">
-              <a href="https://github.com/7flash/solard">github</a>
-              <a href="/docs">docs</a>
-            </div>
-            <div className="fine">
-              open source · self-hosted · not financial advice
-            </div>
+            <div className="v3-footer-tech">Pump discovery · Pump bonding curves · PumpSwap markets · RPC · Helius · Jito · TradJS · SQLite</div>
+            <div className="v3-footer-trust">Self-hosted · Solana mainnet · No SOLARD application trading fee</div>
           </div>
         </footer>
       </div>
