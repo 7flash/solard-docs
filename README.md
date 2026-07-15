@@ -1,12 +1,12 @@
 # SOLARD web and terminal guide
 
-This package contains the TradJS landing page, documentation, and browser routes for [SOLARD](https://github.com/7flash/solard).
+This package contains the TradJS landing page, documentation, and browser routes for [SOLARD](https://github.com/7flash/solard). Follow project updates at [x.com/solardxyz](https://x.com/solardxyz).
 
 The important startup distinction is simple:
 
 - `bun run indexer/main.ts` starts market ingestion and writes local state.
 - `bunx tradjs server` serves the browser terminal and documentation.
-- `sowl` is the CLI. It is not the terminal launcher.
+- `solard` is the CLI. It is not the terminal launcher.
 
 ## Run the full SOLARD terminal
 
@@ -62,7 +62,7 @@ Starting only TradJS serves the interface, but current indexed data requires the
 The CLI is a separate operator interface:
 
 ```bash
-sowl help
+solard help
 ```
 
 Use it for repeatable wallet, token, quote, trade, launch, worker, watch, and script workflows. Begin with simulations and keep `SOLARD_ENABLE_LIVE_TRADES=0` until the complete path has been reviewed.
