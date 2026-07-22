@@ -1,6 +1,7 @@
 import type { DexMarket } from "./market";
 
-export type NewTokenSource = "pumpportal" | "solana-rpc" | "dexscreener-profile";
+export type NewTokenSource =
+  "pumpportal" | "solana-rpc" | "dexscreener-profile";
 
 export type NewTokenItem = {
   id: string;

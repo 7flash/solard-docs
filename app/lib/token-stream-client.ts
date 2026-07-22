@@ -1,4 +1,8 @@
-import type { NewTokenItem, TokenStreamMessage, TokenStreamStatus } from "./new-token";
+import type {
+  NewTokenItem,
+  TokenStreamMessage,
+  TokenStreamStatus,
+} from "./new-token";
 
 export type ClientTokenStreamState = {
   status: TokenStreamStatus;
@@ -27,7 +31,14 @@ let reopenTimer: ReturnType<typeof setTimeout> | null = null;
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
 let bridgeReady = false;
 let state: ClientTokenStreamState = {
-  status: { state: "idle", source: null, label: "new-token stream", message: "Connecting automatically", connectedAt: null, retryAt: null },
+  status: {
+    state: "idle",
+    source: null,
+    label: "new-token stream",
+    message: "Connecting automatically",
+    connectedAt: null,
+    retryAt: null,
+  },
   tokens: [],
   transport: "idle",
 };
@@ -37,7 +48,9 @@ function publish() {
 }
 
 function mergeToken(token: NewTokenItem, prepend: boolean) {
-  const existingIndex = state.tokens.findIndex((item) => item.mint === token.mint);
+  const existingIndex = state.tokens.findIndex(
+    (item) => item.mint === token.mint,
+  );
   const tokens = state.tokens.slice();
   if (existingIndex >= 0) tokens[existingIndex] = token;
   else if (prepend) tokens.unshift(token);
@@ -51,7 +64,9 @@ function handle(message: TokenStreamMessage) {
     state = {
       ...state,
       status: message.snapshot.status,
-      tokens: message.snapshot.tokens.slice(0, 100).sort((a, b) => b.observedAt - a.observedAt),
+      tokens: message.snapshot.tokens
+        .slice(0, 100)
+        .sort((a, b) => b.observedAt - a.observedAt),
     };
   } else if (message.type === "status") {
     state = { ...state, status: message.status };
@@ -78,9 +93,14 @@ function bridgeBootstrap() {
   bridgeReady = true;
   boot.messages.forEach(handle);
   state = { ...state, transport: boot.transport };
-  const onMessage = (event: Event) => handle((event as CustomEvent<TokenStreamMessage>).detail);
+  const onMessage = (event: Event) =>
+    handle((event as CustomEvent<TokenStreamMessage>).detail);
   const onTransport = (event: Event) => {
-    state = { ...state, transport: (event as CustomEvent<ClientTokenStreamState["transport"]>).detail };
+    state = {
+      ...state,
+      transport: (event as CustomEvent<ClientTokenStreamState["transport"]>)
+        .detail,
+    };
     publish();
   };
   window.addEventListener("solard-stream-message", onMessage);
@@ -111,7 +131,8 @@ function ensureWatchdog() {
   watchdogTimer = setInterval(() => {
     const boot = window.__SOLARD_STREAM_BOOT__;
     if (boot) {
-      if (!boot.source || boot.source.readyState === EventSource.CLOSED) boot.open();
+      if (!boot.source || boot.source.readyState === EventSource.CLOSED)
+        boot.open();
       return;
     }
     if (source?.readyState === EventSource.CLOSED) scheduleReopen();

@@ -56,10 +56,13 @@ export type DexMarketError = {
 export function formatUsd(value: number | null | undefined, compact = true) {
   if (value == null || !Number.isFinite(value)) return "—";
   const absolute = Math.abs(value);
-  if (compact && absolute >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(2)}B`;
-  if (compact && absolute >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (compact && absolute >= 1_000_000_000)
+    return `$${(value / 1_000_000_000).toFixed(2)}B`;
+  if (compact && absolute >= 1_000_000)
+    return `$${(value / 1_000_000).toFixed(2)}M`;
   if (compact && absolute >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-  if (absolute >= 1) return `$${value.toLocaleString("en-US", { maximumFractionDigits: 4 })}`;
+  if (absolute >= 1)
+    return `$${value.toLocaleString("en-US", { maximumFractionDigits: 4 })}`;
   if (absolute >= 0.01) return `$${value.toFixed(4)}`;
   if (absolute === 0) return "$0";
   return `$${value.toPrecision(4)}`;
