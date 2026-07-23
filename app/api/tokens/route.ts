@@ -1,11 +1,15 @@
 import { traceLabel } from "../../../src/observability/action";
 import { errorRecord } from "../../../src/observability/error";
 import { serverMeasure } from "../../../src/observability/server";
-import { getTokenFeed } from "../../../src/server/token-feed";
+import {
+  getPumpSwapTokenByMint,
+  getTokenFeed,
+  searchPumpSwapTokens,
+} from "../../../src/server/token-feed";
 import type { TokenFeedPayload } from "../../../src/types";
 
-const POLL_AFTER_MS = 10_000;
-const BUILD_VERSION = "5.4.0";
+const POLL_AFTER_MS = 2_000;
+const BUILD_VERSION = "7.5.0-hot-migrations-search";
 
 function responseHeaders(
   etag: string,
@@ -28,13 +32,13 @@ function payloadEtag(payload: TokenFeedPayload): string {
       token.mint,
       token.pairAddress,
       token.pairCreatedAt,
+      token.tokenCreatedAt,
       token.dexId,
       token.priceUsd,
       token.marketCap,
       token.liquidityUsd,
-      token.volumeM5,
-      token.buysM5,
-      token.sellsM5,
+      token.marketCapSol,
+      token.liquiditySol,
     ]),
   );
   let hash = 2_166_136_261;
@@ -57,13 +61,56 @@ function degradedPayload(error: unknown): TokenFeedPayload {
 
 export async function GET(request: Request) {
   const ifNoneMatch = request.headers.get("if-none-match");
+  const requestUrl = new URL(request.url);
+  const mint = requestUrl.searchParams.get("mint")?.trim() || "";
+  const query = requestUrl.searchParams.get("q")?.trim() || "";
   try {
+    if (query) {
+      const tokens = await searchPumpSwapTokens(query, 12);
+      return Response.json(
+        { tokens },
+        {
+          headers: {
+            "Cache-Control": "no-store, max-age=0",
+            "X-Solard-Build": BUILD_VERSION,
+          },
+        },
+      );
+    }
+    if (mint) {
+      const token = await getPumpSwapTokenByMint(mint);
+      return Response.json(
+        { token },
+        {
+          headers: {
+            "Cache-Control": "no-store, max-age=0",
+            "X-Solard-Build": BUILD_VERSION,
+          },
+        },
+      );
+    }
+
     return await serverMeasure(
       traceLabel("GET /api/tokens", { ifNoneMatch, build: BUILD_VERSION }),
       async () => {
+        // The SQD database contains only canonical Pump migrations into WSOL
+        // PumpSwap pools. Raw Pump create events never enter this response.
+        const url = new URL(request.url);
+        const list = (name: string) =>
+          (url.searchParams.get(name) || "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean)
+            .slice(0, 40);
         const payload = await serverMeasure(
-          "Build token polling snapshot",
-          () => getTokenFeed(),
+          "Build indexed token polling snapshot",
+          () =>
+            getTokenFeed({
+              selected: list("selected"),
+              open: list("open"),
+              visible: list("visible"),
+              pinned: list("pinned"),
+            }),
         );
         if (!payload || !Array.isArray(payload.tokens))
           throw new Error("Token feed returned an invalid payload.");

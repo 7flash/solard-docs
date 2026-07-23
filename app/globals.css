@@ -378,7 +378,7 @@ footer{border-top:1px solid var(--line);padding:30px 0;margin-top:8px}
 @media(max-width:980px){.live-terminal-grid{grid-template-columns:1fr}.live-chart-shell{height:430px}}
 @media(max-width:620px){.terminal-nav{align-items:flex-start;flex-direction:column}.live-chart-shell{height:380px}.snapshot-log .entry{grid-template-columns:65px 76px minmax(0,1fr)}.terminal-actions{width:100%}.term-btn{flex:1}.term-btn.refresh{margin-left:0;flex-basis:100%}}
 
-/* server-streamed new-token discovery */
+/* polled verified-pool discovery */
 .token-stream-grid .market-card{min-height:230px}.token-stream-card.pending{background:linear-gradient(180deg,rgba(79,124,247,.025),rgba(0,0,0,.62))}.token-stream-card.indexed{background:linear-gradient(180deg,rgba(31,211,95,.025),rgba(0,0,0,.62))}.token-stream-card .market-card-top>div{max-width:72%}.token-stream-card .market-card-top small{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pending-label{color:#4f7cf7;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em}.market-source b{color:var(--ink);font-weight:500}
 
 /* live token terminal */
@@ -809,3 +809,11 @@ footer{border-top:1px solid var(--line);padding:30px 0;margin-top:8px}
   .v4-open-source-panel{padding:28px 22px}.v4-command pre{font-size:10px}
   .v4-footer-tech{line-height:1.8}
 }
+/* New stream arrivals merge above existing rows without flashing the table. */
+.trow.arrive{animation:token-arrive .58s cubic-bezier(.2,.8,.2,1) both}
+@keyframes token-arrive{
+  from{opacity:0;transform:translateY(-12px);background:rgba(31,211,95,.12)}
+  65%{opacity:1;transform:translateY(0);background:rgba(31,211,95,.055)}
+  to{opacity:1;transform:none;background:transparent}
+}
+@media(prefers-reduced-motion:reduce){.trow.arrive{animation:none}}

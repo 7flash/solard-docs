@@ -21,7 +21,7 @@ export default function mount() {
   clientMeasure.note(
     traceLabel("Mount SOLARD page", {
       root: "#app-root",
-      build: "5.4.0",
+      build: "6.2.1-context-menu",
       feed: "polling",
     }),
   );

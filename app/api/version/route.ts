@@ -5,9 +5,10 @@ import {
 } from "../../../src/observability/server";
 
 const BUILD = {
-  name: "solard-tradjs-terminal",
-  version: "5.4.0",
-  feedTransport: "polling",
+  name: "solard-trade-app",
+  version: "7.4.0-sqd-latest-seeds",
+  feedTransport: "sqlite-polling",
+  indexer: "SQD Pump migrate + SOLARD",
   observability: serverMeasureCapabilities,
 } as const;
 

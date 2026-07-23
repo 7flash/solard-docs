@@ -4,14 +4,18 @@ import {
   serverMeasure,
 } from "../../../src/observability/server";
 
+function configuredRpcMaxRps(): number {
+  const value = Number(Bun.env.PUBLIC_RPC_MAX_RPS || 1);
+  return Number.isFinite(value) ? Math.max(1, Math.min(2, value)) : 1;
+}
+
 const defaults = {
   rpcUrl: "https://api.mainnet-beta.solana.com",
+  rpcMaxRps: 1,
   cluster: "mainnet-beta",
   programId: "5cvRkbFXRozP2tZ9VW3xk3HCYZxcojsL69Lq2qzeSLRD",
-  marketAddress: "21yRg8vY3hQz8tbB5NjawiXVj2yY3q82aEWwiuYRSpxJ",
-  vaultAddress: "3jPWVp8hec8yJ2kkazqsPD7Q3d7nkcvkpvirTQ2dX7tZ",
-  marketSymbol: "SOLARD",
-  collateralSymbol: "COLLATERAL",
+  pumpSwapProgramId: "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+  collateralSymbol: "SOL",
   explorerBase: "https://solscan.io",
 };
 
@@ -21,12 +25,11 @@ export async function GET() {
       Response.json(
         {
           rpcUrl: Bun.env.PUBLIC_SOLANA_RPC_URL || defaults.rpcUrl,
+          rpcMaxRps: configuredRpcMaxRps(),
           cluster: Bun.env.PUBLIC_SOLANA_CLUSTER || defaults.cluster,
           programId: Bun.env.PUBLIC_PROGRAM_ID || defaults.programId,
-          marketAddress:
-            Bun.env.PUBLIC_MARKET_ADDRESS || defaults.marketAddress,
-          vaultAddress: Bun.env.PUBLIC_VAULT_ADDRESS || defaults.vaultAddress,
-          marketSymbol: Bun.env.PUBLIC_MARKET_SYMBOL || defaults.marketSymbol,
+          pumpSwapProgramId:
+            Bun.env.PUBLIC_PUMPSWAP_PROGRAM_ID || defaults.pumpSwapProgramId,
           collateralSymbol:
             Bun.env.PUBLIC_COLLATERAL_SYMBOL || defaults.collateralSymbol,
           explorerBase: Bun.env.PUBLIC_EXPLORER_BASE || defaults.explorerBase,

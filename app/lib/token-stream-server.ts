@@ -14,7 +14,8 @@ import { streamSourceLabel } from "./new-token";
 
 const MAX_BUFFER = 100;
 const MAX_SEEN = 2_000;
-const MAX_RPC_FETCHES = 6;
+const MAX_RPC_FETCHES = 1;
+const RPC_REQUEST_INTERVAL_MS = 525; // <= 2 RPS; browser reads use the remaining RPC budget.
 const ENRICH_DELAYS = [0, 5_000, 15_000, 30_000, 60_000, 120_000];
 const TX_RETRY_DELAYS = [0, 500, 1_500, 3_000, 6_000];
 const DEFAULT_DEX_WS = "wss://api.dexscreener.com/token-profiles/latest/v1";
@@ -213,6 +214,7 @@ class TokenStreamManager {
   private pendingSignatures = new Set<string>();
   private rpcQueue: string[] = [];
   private activeRpcFetches = 0;
+  private nextRpcRequestAt = 0;
   private websocket: WebSocket | null = null;
   private started = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -589,9 +591,16 @@ class TokenStreamManager {
     }
   }
 
+  private async waitForRpcRequestSlot() {
+    const delay = Math.max(0, this.nextRpcRequestAt - Date.now());
+    if (delay) await sleep(delay);
+    this.nextRpcRequestAt = Date.now() + RPC_REQUEST_INTERVAL_MS;
+  }
+
   private async getSolanaTransaction(signature: string) {
     for (const delay of TX_RETRY_DELAYS) {
       if (delay) await sleep(delay);
+      await this.waitForRpcRequestSlot();
       try {
         const response = await fetch(solanaRpcUrl(), {
           method: "POST",

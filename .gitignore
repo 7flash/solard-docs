@@ -3,3 +3,10 @@ dist/
 .DS_Store
 *.log
 bun.lockb
+bun.lock
+package-lock.json
+*.db
+*.db-wal
+*.db-shm
+.config.toml
+bun.lock

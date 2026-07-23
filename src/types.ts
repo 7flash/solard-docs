@@ -6,22 +6,22 @@ import type {
 
 export type SolardConfig = {
   rpcUrl: string;
+  rpcMaxRps: number;
   cluster: string;
   programId: string;
-  marketAddress: string;
-  vaultAddress: string;
-  marketSymbol: string;
+  pumpSwapProgramId: string;
   collateralSymbol: string;
   explorerBase: string;
 };
 
 export type SideName = "long" | "short";
-export type FeedFilter = "all" | "new" | "migrated" | "active";
-export type FeedSort = "created" | "marketCap" | "volume" | "leverage";
+export type FeedSort = "age" | "marketCap" | "health";
 export type WalletProviderName = "phantom" | "solflare" | "backpack";
 
 export type PublicKeyLike =
-  PublicKey | { toString(): string; toBase58?: () => string } | string;
+  | PublicKey
+  | { toString(): string; toBase58?: () => string }
+  | string;
 export type SolanaTransaction = Transaction | VersionedTransaction;
 
 export type InjectedWallet = {
@@ -53,29 +53,20 @@ export type WalletOption = {
   provider: InjectedWallet;
 };
 
+/**
+ * A token-specific executable view assembled from the one Solard Global account
+ * plus a PumpSwap Pool account. There is no Solard Market account in the current
+ * program; `address` is the PumpSwap pool address.
+ */
 export type MarketSnapshot = {
   address: PublicKey;
+  global: PublicKey;
   authority: PublicKey;
-  oracleAuthority: PublicKey;
   collateralMint: PublicKey;
   vault: PublicKey;
-  marketIndex: bigint;
-  storedPriceE6: bigint;
-  poolPriceE6: bigint;
-  lastPriceUpdateSlot: bigint;
-  currentSlot: bigint;
-  maxPriceAgeSlots: bigint;
-  maxOpenInterest: bigint;
-  totalOpenInterest: bigint;
-  longOpenInterest: bigint;
-  shortOpenInterest: bigint;
   totalCollateral: bigint;
   vaultBalance: bigint;
-  maxLeverageBps: number;
-  maintenanceMarginBps: number;
-  liquidationRewardBps: number;
   paused: boolean;
-  settlementMode: boolean;
   pumpswapPool: PublicKey;
   poolBaseToken: PublicKey;
   poolQuoteToken: PublicKey;
@@ -85,12 +76,20 @@ export type MarketSnapshot = {
   quoteDecimals: number;
   collateralDecimals: number;
   tokenProgram: PublicKey;
+  storedPriceE6: bigint;
+  poolPriceE6: bigint;
+  virtualQuoteReserves: bigint;
+  currentSlot: bigint;
+  maxLeverageBps: number;
+  maintenanceMarginBps: number;
+  settlementMode: boolean;
 };
 
 export type PositionSnapshot = {
   address: PublicKey;
   owner: PublicKey;
-  market: PublicKey;
+  baseMint: PublicKey;
+  pool: PublicKey;
   collateralAmount: bigint;
   notionalAmount: bigint;
   entryPriceE6: bigint;
@@ -106,7 +105,10 @@ export type MarketPosition = {
 };
 
 export type WalletBalances = {
+  /** Spendable native SOL plus wrapped SOL, net of the transaction-fee reserve. */
   raw: bigint;
+  /** Actual native SOL plus wrapped SOL before reserving transaction fees. */
+  totalRaw: bigint;
   ata: PublicKey | null;
 };
 
@@ -121,23 +123,25 @@ export type ActivityItem = {
 export type FeedToken = {
   mint: string;
   pairAddress: string | null;
+  poolBaseToken?: string | null;
+  poolQuoteToken?: string | null;
+  quoteMint?: string | null;
+  baseDecimals?: number;
   symbol: string;
   name: string;
   imageUrl: string | null;
   dexId: string;
   quoteSymbol: string;
   url: string | null;
-  priceUsd: number;
-  priceNative: number;
-  marketCap: number;
-  fdv: number;
-  liquidityUsd: number;
-  volumeM5: number;
-  volumeH1: number;
-  priceChangeM5: number;
-  buysM5: number;
-  sellsM5: number;
+  priceUsd: number | null;
+  priceNative: number | null;
+  marketCap: number | null;
+  fdv: number | null;
+  liquidityUsd: number | null;
+  marketCapSol: number | null;
+  liquiditySol: number | null;
   pairCreatedAt: number;
+  tokenCreatedAt: number | null;
   newPair: boolean;
   migrated: boolean;
   activePerp: boolean;
@@ -145,7 +149,9 @@ export type FeedToken = {
   maxLeverage: number;
   paused: boolean;
   settlementMode: boolean;
-  source: "dexscreener" | "geckoterminal" | "onchain";
+  source: "onchain";
+  seeded: boolean;
+  seedRank: number | null;
 };
 
 export type TokenFeedPayload = {
@@ -155,13 +161,6 @@ export type TokenFeedPayload = {
   warning?: string;
 };
 
-export type TapeItem = {
-  mint: string;
-  symbol: string;
-  direction: 1 | -1;
-  value: number;
-  time: number;
-};
 
 export type ToastItem = {
   id: number;

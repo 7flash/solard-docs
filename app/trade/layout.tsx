@@ -7,7 +7,7 @@ export default function RootLayout({ children }: { children: unknown }) {
         <meta name="theme-color" content="#08090b" />
         <meta
           name="description"
-          content="SOLARD live Solana token terminal and perpetuals trading interface"
+          content="SOLARD live Solana token perpetuals trading interface"
         />
         <title>SOLARD:// LIVE PERPS</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />

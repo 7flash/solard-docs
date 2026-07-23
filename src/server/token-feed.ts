@@ -1,442 +1,461 @@
+import { Buffer } from "buffer";
+import { PublicKey } from "@solana/web3.js";
+import { marketDatabase, type IndexedToken } from "../../shared/market-db";
 import type { FeedToken, TokenFeedPayload } from "../types";
 import { traceLabel } from "../observability/action";
 import { serverMeasure } from "../observability/server";
 
-const USER_AGENT = "SOLARD-TradJS/5.4";
-const CACHE_MS = 8_000;
+const WSOL_MINT = "So11111111111111111111111111111111111111112";
+const PUMPSWAP_PROGRAM = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA";
+const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+const PUMPSWAP_POOL_DISC = Uint8Array.from([241, 154, 109, 4, 17, 177, 109, 188]);
 const NEW_PAIR_MS = 6 * 60 * 60 * 1_000;
-const MAX_TOKENS = 70;
+const MAX_FEED_TOKENS = 120;
+const PRICE_REFRESH_LIMIT = 5;
 
-let cached: TokenFeedPayload | null = null;
-let cachedAt = 0;
-let pending: Promise<TokenFeedPayload> | null = null;
+type FeedPriority = {
+  selected?: string[];
+  open?: string[];
+  visible?: string[];
+  pinned?: string[];
+};
 
-function numeric(value: unknown): number {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
+type RpcAccount = {
+  owner: string;
+  lamports: number;
+  data: Buffer;
+};
+
+type StaticPoolState = {
+  baseDecimals: number;
+  supplyRaw: bigint;
+  virtualQuoteRaw: bigint;
+  expiresAt: number;
+};
+
+type PriceState = {
+  priceSol: number;
+  marketCapSol: number;
+  liquiditySol: number;
+  marketCapUsd: number | null;
+  liquidityUsd: number | null;
+  baseReserveRaw: bigint;
+  quoteReserveRaw: bigint;
+  fetchedAt: number;
+  stale: boolean;
+};
+
+class RpcGate {
+  private tail: Promise<void> = Promise.resolve();
+  private nextAt = 0;
+
+  schedule<T>(work: () => Promise<T>): Promise<T> {
+    const task = this.tail.catch(() => undefined).then(async () => {
+      const rps = Math.max(
+        1,
+        Math.min(3, Math.floor(Number(process.env.SOLARD_SERVER_RPC_RPS ?? 3))),
+      );
+      const wait = Math.max(0, this.nextAt - Date.now());
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      this.nextAt = Date.now() + Math.ceil(1_000 / rps) + 10;
+      return work();
+    });
+    this.tail = task.then(() => undefined, () => undefined);
+    return task;
+  }
 }
 
-function text(value: unknown, fallback = ""): string {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+const rpcGate = new RpcGate();
+const staticPoolCache = new Map<string, StaticPoolState>();
+const staticPoolInvalidUntil = new Map<string, number>();
+const priceCache = new Map<string, PriceState>();
+const priceInflight = new Map<string, Promise<PriceState>>();
+let solUsdCache: { value: number | null; expiresAt: number } = { value: null, expiresAt: 0 };
+let refreshCursor = 0;
+
+function rpcUrl(): string {
+  return process.env.SOLANA_RPC_URL ??
+    process.env.PUBLIC_SOLANA_RPC_URL ??
+    "https://api.mainnet-beta.solana.com";
 }
 
-async function fetchJson<T>(url: string, timeoutMs = 8_000): Promise<T> {
-  const target = new URL(url);
-  return serverMeasure(
-    traceLabel("Fetch upstream JSON", {
-      host: target.host,
-      path: target.pathname,
-      timeoutMs,
+async function getAccountInfo(address: string): Promise<RpcAccount | null> {
+  return rpcGate.schedule(async () => {
+    const response = await fetch(rpcUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: `solard-${address.slice(0, 8)}-${Date.now()}`,
+        method: "getAccountInfo",
+        params: [address, { encoding: "base64", commitment: "confirmed" }],
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const body = await response.text();
+    if (!response.ok) {
+      throw new Error(`RPC ${response.status}: ${body.slice(0, 240)}`);
+    }
+    const json = JSON.parse(body) as {
+      error?: { code?: number; message?: string };
+      result?: {
+        value?: {
+          owner?: string;
+          lamports?: number;
+          data?: [string, string];
+        } | null;
+      };
+    };
+    if (json.error) {
+      throw new Error(
+        `${json.error.code ?? "RPC"}: ${json.error.message ?? "request failed"}`,
+      );
+    }
+    const value = json.result?.value;
+    const encoded = Array.isArray(value?.data) ? value?.data[0] : null;
+    if (!value || typeof value.owner !== "string" || typeof encoded !== "string")
+      return null;
+    return {
+      owner: value.owner,
+      lamports: Number(value.lamports ?? 0),
+      data: Buffer.from(encoded, "base64"),
+    };
+  });
+}
+
+function readU64(data: Buffer, offset: number): bigint {
+  if (data.length < offset + 8) throw new Error("account data is truncated");
+  return data.readBigUInt64LE(offset);
+}
+
+function readI128(data: Buffer, offset: number): bigint {
+  if (data.length < offset + 16) return 0n;
+  let value = 0n;
+  for (let index = 0; index < 16; index += 1)
+    value |= BigInt(data[offset + index]!) << BigInt(index * 8);
+  return value & (1n << 127n) ? value - (1n << 128n) : value;
+}
+
+function hasPrefix(data: Buffer, prefix: Uint8Array): boolean {
+  if (data.length < prefix.length) return false;
+  for (let index = 0; index < prefix.length; index += 1)
+    if (data[index] !== prefix[index]) return false;
+  return true;
+}
+
+function isSupportedTokenProgram(owner: string): boolean {
+  return owner === TOKEN_PROGRAM || owner === TOKEN_2022_PROGRAM;
+}
+
+function tokenAmount(data: Buffer): bigint {
+  // SPL Token account layout: mint[0..32], owner[32..64], amount u64 at 64.
+  return readU64(data, 64);
+}
+
+function mintState(data: Buffer): { supply: bigint; decimals: number } {
+  // Classic SPL Mint layout: supply u64 at 36 and decimals u8 at 44.
+  if (data.length < 45) throw new Error("mint account is truncated");
+  return { supply: readU64(data, 36), decimals: data[44]! };
+}
+
+async function getSolUsd(): Promise<number | null> {
+  if (solUsdCache.expiresAt > Date.now()) return solUsdCache.value;
+  try {
+    const response = await fetch("https://api.coinbase.com/v2/prices/SOL-USD/spot", {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(4_000),
+    });
+    if (!response.ok) throw new Error(`SOL/USD ${response.status}`);
+    const json = (await response.json()) as { data?: { amount?: string } };
+    const value = Number(json.data?.amount ?? 0);
+    if (Number.isFinite(value) && value > 0) solUsdCache.value = value;
+  } catch {
+    // Retain the last valid conversion. Token/SOL prices remain usable without it.
+  }
+  solUsdCache.expiresAt = Date.now() + 60_000;
+  return solUsdCache.value;
+}
+
+async function staticPoolState(token: IndexedToken): Promise<StaticPoolState> {
+  const cached = staticPoolCache.get(token.mint);
+  if (cached && cached.expiresAt > Date.now()) return cached;
+  if ((staticPoolInvalidUntil.get(token.mint) ?? 0) > Date.now())
+    throw new Error(`Pool ${token.pool} is temporarily excluded after failed validation.`);
+  try {
+    const [poolInfo, mintInfo] = await Promise.all([
+      getAccountInfo(token.pool),
+      getAccountInfo(token.mint),
+    ]);
+    if (
+      !poolInfo ||
+      poolInfo.owner !== PUMPSWAP_PROGRAM ||
+      !hasPrefix(poolInfo.data, PUMPSWAP_POOL_DISC)
+    ) throw new Error(`Indexed pool ${token.pool} is unavailable or invalid.`);
+    if (!mintInfo || !isSupportedTokenProgram(mintInfo.owner))
+      throw new Error(`Mint ${token.mint} is unavailable or uses an unsupported token program.`);
+    if (poolInfo.data.length < 203)
+      throw new Error(`Indexed pool ${token.pool} is truncated.`);
+    const poolBaseMint = new PublicKey(poolInfo.data.subarray(43, 75)).toBase58();
+    const poolQuoteMint = new PublicKey(poolInfo.data.subarray(75, 107)).toBase58();
+    const poolBaseReserve = new PublicKey(poolInfo.data.subarray(139, 171)).toBase58();
+    const poolQuoteReserve = new PublicKey(poolInfo.data.subarray(171, 203)).toBase58();
+    if (
+      poolBaseMint !== token.mint ||
+      poolQuoteMint !== WSOL_MINT ||
+      poolBaseReserve !== token.pool_base_token ||
+      poolQuoteReserve !== token.pool_quote_token
+    ) throw new Error(`Indexed pool ${token.pool} does not match its migration accounts.`);
+    const mint = mintState(mintInfo.data);
+    const value: StaticPoolState = {
+      baseDecimals: mint.decimals,
+      supplyRaw: mint.supply,
+      virtualQuoteRaw: readI128(poolInfo.data, 245),
+      expiresAt: Date.now() + 10 * 60_000,
+    };
+    staticPoolCache.set(token.mint, value);
+    staticPoolInvalidUntil.delete(token.mint);
+    return value;
+  } catch (error) {
+    staticPoolInvalidUntil.set(token.mint, Date.now() + 15_000);
+    throw error;
+  }
+}
+
+async function refreshPrice(token: IndexedToken): Promise<PriceState> {
+  const existing = priceInflight.get(token.mint);
+  if (existing) return existing;
+  const work = serverMeasure(
+    traceLabel("Refresh indexed PumpSwap price", {
+      mint: token.mint,
+      pool: token.pool,
     }),
     async () => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(url, {
-          headers: {
-            Accept: "application/json",
-            "User-Agent": USER_AGENT,
-          },
-          signal: controller.signal,
-        });
-        if (!response.ok)
-          throw new Error(`${response.status} ${response.statusText}`);
-        return (await response.json()) as T;
-      } finally {
-        clearTimeout(timer);
-      }
+      const staticState = await staticPoolState(token);
+      const [baseInfo, quoteInfo, solUsd] = await Promise.all([
+        getAccountInfo(token.pool_base_token),
+        getAccountInfo(token.pool_quote_token),
+        getSolUsd(),
+      ]);
+      if (!baseInfo || !quoteInfo) throw new Error("Pool reserve account is missing.");
+      if (!isSupportedTokenProgram(baseInfo.owner) || !isSupportedTokenProgram(quoteInfo.owner))
+        throw new Error("Pool reserve uses an unsupported token program.");
+      const baseReserveMint = new PublicKey(baseInfo.data.subarray(0, 32)).toBase58();
+      const quoteReserveMint = new PublicKey(quoteInfo.data.subarray(0, 32)).toBase58();
+      if (baseReserveMint !== token.mint || quoteReserveMint !== WSOL_MINT)
+        throw new Error("Pool reserve mint mismatch.");
+      const baseRaw = tokenAmount(baseInfo.data);
+      const quoteRaw = tokenAmount(quoteInfo.data);
+      const effectiveQuote =
+        quoteRaw +
+        (staticState.virtualQuoteRaw > 0n ? staticState.virtualQuoteRaw : 0n);
+      const baseUi = Number(baseRaw) / 10 ** staticState.baseDecimals;
+      const quoteUi = Number(effectiveQuote) / 1_000_000_000;
+      if (!(baseUi > 0) || !(quoteUi > 0))
+        throw new Error("Pool reserves cannot produce a valid price.");
+      const priceSol = quoteUi / baseUi;
+      if (!Number.isFinite(priceSol) || priceSol <= 0)
+        throw new Error("Pool reserves produced an invalid price.");
+      const supplyUi = Number(staticState.supplyRaw) / 10 ** staticState.baseDecimals;
+      const marketCapSol = priceSol * supplyUi;
+      const liquiditySol = quoteUi * 2;
+      if (!Number.isFinite(marketCapSol) || marketCapSol <= 0)
+        throw new Error("Pool state cannot produce a valid SOL market cap.");
+      if (!Number.isFinite(liquiditySol) || liquiditySol <= 0)
+        throw new Error("Pool state cannot produce valid SOL liquidity.");
+      const marketCapUsd =
+        solUsd != null ? marketCapSol * solUsd : null;
+      const liquidityUsd = solUsd != null ? liquiditySol * solUsd : null;
+      const value: PriceState = {
+        priceSol,
+        marketCapSol,
+        liquiditySol,
+        marketCapUsd:
+          marketCapUsd != null && Number.isFinite(marketCapUsd)
+            ? marketCapUsd
+            : null,
+        liquidityUsd:
+          liquidityUsd != null && Number.isFinite(liquidityUsd)
+            ? liquidityUsd
+            : null,
+        baseReserveRaw: baseRaw,
+        quoteReserveRaw: effectiveQuote,
+        fetchedAt: Date.now(),
+        stale: false,
+      };
+      priceCache.set(token.mint, value);
+      return value;
     },
-  );
+  ).finally(() => priceInflight.delete(token.mint));
+  priceInflight.set(token.mint, work);
+  return work;
 }
 
-type DexPair = {
-  chainId?: string;
-  dexId?: string;
-  url?: string;
-  pairAddress?: string;
-  labels?: string[];
-  baseToken?: { address?: string; name?: string; symbol?: string };
-  quoteToken?: { address?: string; name?: string; symbol?: string };
-  priceNative?: string;
-  priceUsd?: string | null;
-  txns?: Record<string, { buys?: number; sells?: number }>;
-  volume?: Record<string, number>;
-  priceChange?: Record<string, number> | null;
-  liquidity?: { usd?: number; base?: number; quote?: number } | null;
-  fdv?: number | null;
-  marketCap?: number | null;
-  pairCreatedAt?: number | null;
-  info?: { imageUrl?: string; websites?: Array<{ url?: string }> };
-};
-
-type TokenProfile = {
-  chainId?: string;
-  tokenAddress?: string;
-  icon?: string;
-};
-
-type GeckoResource = {
-  id?: string;
-  type?: string;
-  attributes?: Record<string, any>;
-  relationships?: Record<string, { data?: { id?: string; type?: string } }>;
-};
-
-type GeckoResponse = {
-  data?: GeckoResource[];
-  included?: GeckoResource[];
-};
-
-type DiscoveryToken = {
-  mint: string;
-  symbol: string;
-  name: string;
-  imageUrl: string | null;
-  pairAddress: string | null;
-  dexId: string;
-  quoteSymbol: string;
-  url: string | null;
-  priceUsd: number;
-  priceNative: number;
-  marketCap: number;
-  fdv: number;
-  liquidityUsd: number;
-  volumeM5: number;
-  volumeH1: number;
-  priceChangeM5: number;
-  buysM5: number;
-  sellsM5: number;
-  pairCreatedAt: number;
-  source: "geckoterminal";
-};
-
-function addressFromGeckoId(id: string | undefined): string {
-  if (!id) return "";
-  const separator = id.indexOf("_");
-  return separator >= 0 ? id.slice(separator + 1) : id;
+function unique(values: string[] | undefined): string[] {
+  return [...new Set((values ?? []).filter(Boolean))];
 }
 
-function parseGecko(response: GeckoResponse): DiscoveryToken[] {
-  const included = new Map<string, GeckoResource>();
-  for (const resource of response.included || []) {
-    if (resource.id) included.set(resource.id, resource);
-  }
-
-  const tokens: DiscoveryToken[] = [];
-  for (const pool of response.data || []) {
-    const attrs = pool.attributes || {};
-    const baseRef = pool.relationships?.base_token?.data?.id;
-    const quoteRef = pool.relationships?.quote_token?.data?.id;
-    const dexRef = pool.relationships?.dex?.data?.id;
-    const base = baseRef ? included.get(baseRef)?.attributes || {} : {};
-    const quote = quoteRef ? included.get(quoteRef)?.attributes || {} : {};
-    const dex = dexRef ? included.get(dexRef)?.attributes || {} : {};
-    const mint = text(base.address) || addressFromGeckoId(baseRef);
-    if (!mint) continue;
-
-    const created = Date.parse(text(attrs.pool_created_at));
-    const pairCreatedAt = Number.isFinite(created) ? created : Date.now();
-    const transactions = attrs.transactions?.m5 || {};
-    tokens.push({
-      mint,
-      symbol: text(base.symbol, text(attrs.name, "TOKEN").split("/")[0].trim()),
-      name: text(
-        base.name,
-        text(attrs.name, "Unknown token").split("/")[0].trim(),
-      ),
-      imageUrl: text(base.image_url) || null,
-      pairAddress: text(attrs.address) || addressFromGeckoId(pool.id) || null,
-      dexId: text(dex.identifier, text(dexRef, "unknown")),
-      quoteSymbol: text(quote.symbol, "SOL"),
-      url: text(attrs.geckoterminal_url) || null,
-      priceUsd: numeric(attrs.base_token_price_usd),
-      priceNative: numeric(attrs.base_token_price_quote_token),
-      marketCap: numeric(attrs.market_cap_usd),
-      fdv: numeric(attrs.fdv_usd),
-      liquidityUsd: numeric(attrs.reserve_in_usd),
-      volumeM5: numeric(attrs.volume_usd?.m5),
-      volumeH1: numeric(attrs.volume_usd?.h1),
-      priceChangeM5: numeric(attrs.price_change_percentage?.m5),
-      buysM5: numeric(transactions.buys),
-      sellsM5: numeric(transactions.sells),
-      pairCreatedAt,
-      source: "geckoterminal",
-    });
-  }
-  return tokens;
-}
-
-async function discoverNewPools(): Promise<DiscoveryToken[]> {
-  return serverMeasure("Discover GeckoTerminal pools", async () => {
-    const urls = [1, 2].map(
-      (page) =>
-        `https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=${page}&include=base_token,quote_token,dex`,
-    );
-    const results = await Promise.allSettled(
-      urls.map((url) => fetchJson<GeckoResponse>(url)),
-    );
-    const tokens = results.flatMap((result) =>
-      result.status === "fulfilled" ? parseGecko(result.value) : [],
-    );
-    serverMeasure.note(
-      traceLabel("GeckoTerminal pools discovered", { tokens: tokens.length }),
-    );
-    return tokens;
-  });
-}
-
-async function discoverDexAddresses(): Promise<Map<string, string | null>> {
-  return serverMeasure("Discover DEX Screener profiles", async () => {
-    const urls = [
-      "https://api.dexscreener.com/token-profiles/latest/v1",
-      "https://api.dexscreener.com/token-boosts/latest/v1",
-      "https://api.dexscreener.com/token-boosts/top/v1",
-    ];
-    const results = await Promise.allSettled(
-      urls.map((url) => fetchJson<TokenProfile[]>(url)),
-    );
-    const addresses = new Map<string, string | null>();
-    for (const result of results) {
-      if (result.status !== "fulfilled" || !Array.isArray(result.value))
-        continue;
-      for (const profile of result.value) {
-        if (profile.chainId !== "solana" || !profile.tokenAddress) continue;
-        addresses.set(
-          profile.tokenAddress,
-          profile.icon || addresses.get(profile.tokenAddress) || null,
-        );
-      }
-    }
-    serverMeasure.note(
-      traceLabel("DEX Screener profiles discovered", {
-        tokens: addresses.size,
-      }),
-    );
-    return addresses;
-  });
-}
-
-async function fetchDexPairs(addresses: string[]): Promise<DexPair[]> {
-  return serverMeasure(
-    traceLabel("Enrich DEX Screener pairs", { addresses: addresses.length }),
-    async () => {
-      const unique = [...new Set(addresses)].slice(0, 60);
-      const batches: string[][] = [];
-      for (let index = 0; index < unique.length; index += 30) {
-        batches.push(unique.slice(index, index + 30));
-      }
-      const results = await Promise.allSettled(
-        batches.map((batch) =>
-          fetchJson<DexPair[]>(
-            `https://api.dexscreener.com/tokens/v1/solana/${batch.join(",")}`,
-          ),
-        ),
-      );
-      const pairs = results.flatMap((result) =>
-        result.status === "fulfilled" && Array.isArray(result.value)
-          ? result.value
-          : [],
-      );
-      serverMeasure.note(
-        traceLabel("DEX Screener pairs enriched", { pairs: pairs.length }),
-      );
-      return pairs;
-    },
-  );
-}
-
-function pairScore(pair: DexPair): number {
-  const liquidity = numeric(pair.liquidity?.usd);
-  const volume = numeric(pair.volume?.h1);
-  const migrationBonus = text(pair.dexId).toLowerCase().includes("pumpswap")
-    ? 10_000_000
-    : 0;
-  return migrationBonus + liquidity + volume * 0.2;
-}
-
-function bestPairsByMint(pairs: DexPair[]): Map<string, DexPair> {
-  const best = new Map<string, DexPair>();
-  for (const pair of pairs) {
-    if (pair.chainId !== "solana") continue;
-    const mint = text(pair.baseToken?.address);
-    if (!mint) continue;
-    const current = best.get(mint);
-    if (!current || pairScore(pair) > pairScore(current)) best.set(mint, pair);
-  }
-  return best;
-}
-
-function normalizeDexPair(
-  pair: DexPair,
-  fallbackImage: string | null = null,
-): FeedToken | null {
-  const mint = text(pair.baseToken?.address);
-  if (!mint) return null;
-  const created = numeric(pair.pairCreatedAt) || Date.now();
-  const dexId = text(pair.dexId, "unknown");
-  return {
-    mint,
-    pairAddress: text(pair.pairAddress) || null,
-    symbol: text(pair.baseToken?.symbol, "TOKEN"),
-    name: text(pair.baseToken?.name, "Unknown token"),
-    imageUrl: text(pair.info?.imageUrl) || fallbackImage,
-    dexId,
-    quoteSymbol: text(pair.quoteToken?.symbol, "SOL"),
-    url: text(pair.url) || null,
-    priceUsd: numeric(pair.priceUsd),
-    priceNative: numeric(pair.priceNative),
-    marketCap: numeric(pair.marketCap) || numeric(pair.fdv),
-    fdv: numeric(pair.fdv),
-    liquidityUsd: numeric(pair.liquidity?.usd),
-    volumeM5: numeric(pair.volume?.m5),
-    volumeH1: numeric(pair.volume?.h1),
-    priceChangeM5: numeric(pair.priceChange?.m5),
-    buysM5: numeric(pair.txns?.m5?.buys),
-    sellsM5: numeric(pair.txns?.m5?.sells),
-    pairCreatedAt: created,
-    newPair: Date.now() - created <= NEW_PAIR_MS,
-    migrated: dexId.toLowerCase().includes("pumpswap"),
-    activePerp: false,
-    marketAddress: null,
-    maxLeverage: 0,
-    paused: false,
-    settlementMode: false,
-    source: "dexscreener",
-  };
-}
-
-function normalizeDiscovery(token: DiscoveryToken): FeedToken {
-  const dexId = token.dexId;
-  return {
-    ...token,
-    marketCap: token.marketCap || token.fdv,
-    newPair: Date.now() - token.pairCreatedAt <= NEW_PAIR_MS,
-    migrated: dexId.toLowerCase().includes("pumpswap"),
-    activePerp: false,
-    marketAddress: null,
-    maxLeverage: 0,
-    paused: false,
-    settlementMode: false,
-  };
-}
-
-async function buildFeed(): Promise<TokenFeedPayload> {
-  return serverMeasure("Build public token feed", async () => {
-    const warnings: string[] = [];
-    let discovered: DiscoveryToken[] = [];
-    let profileImages = new Map<string, string | null>();
-
-    const [geckoResult, profilesResult] = await Promise.allSettled([
-      discoverNewPools(),
-      discoverDexAddresses(),
-    ]);
-    if (geckoResult.status === "fulfilled") discovered = geckoResult.value;
-    else warnings.push("GeckoTerminal new-pool discovery is unavailable.");
-    if (profilesResult.status === "fulfilled")
-      profileImages = profilesResult.value;
-    else warnings.push("DEX Screener profile discovery is unavailable.");
-
-    const addressOrder = [
-      ...discovered.map((token) => token.mint),
-      ...profileImages.keys(),
-    ];
-    const pairs = await fetchDexPairs(addressOrder);
-    if (pairs.length === 0)
-      warnings.push("DEX Screener pair enrichment returned no data.");
-    const bestPairs = bestPairsByMint(pairs);
-    const discoveredByMint = new Map(
-      discovered.map((token) => [token.mint, token]),
-    );
-    const allMints = [...new Set([...addressOrder, ...bestPairs.keys()])];
-    const tokens: FeedToken[] = [];
-
-    for (const mint of allMints) {
-      const pair = bestPairs.get(mint);
-      const dexToken = pair
-        ? normalizeDexPair(pair, profileImages.get(mint) || null)
-        : null;
-      if (dexToken) {
-        const discovery = discoveredByMint.get(mint);
-        if (discovery && discovery.pairCreatedAt > dexToken.pairCreatedAt) {
-          dexToken.pairCreatedAt = discovery.pairCreatedAt;
-          dexToken.newPair =
-            Date.now() - discovery.pairCreatedAt <= NEW_PAIR_MS;
-        }
-        tokens.push(dexToken);
-        continue;
-      }
-      const discovery = discoveredByMint.get(mint);
-      if (discovery) tokens.push(normalizeDiscovery(discovery));
-    }
-
-    const deduped = [
-      ...new Map(tokens.map((token) => [token.mint, token])).values(),
-    ]
-      .sort((a, b) => b.pairCreatedAt - a.pairCreatedAt)
-      .slice(0, MAX_TOKENS);
-
-    const payload: TokenFeedPayload = {
-      tokens: deduped,
-      updatedAt: Date.now(),
-      source: "GeckoTerminal new pools + DEX Screener pair data",
-      ...(warnings.length ? { warning: warnings.join(" ") } : {}),
-    };
-    serverMeasure.note(
-      traceLabel("Public token feed built", {
-        tokens: payload.tokens.length,
-        warning: Boolean(payload.warning),
-      }),
-    );
-    return payload;
-  });
-}
-
-export async function getTokenFeed(force = false): Promise<TokenFeedPayload> {
+function refreshPlan(tokens: IndexedToken[], priority: FeedPriority): IndexedToken[] {
+  const byMint = new Map(tokens.map((token) => [token.mint, token]));
   const now = Date.now();
-  if (!force && cached && now - cachedAt < CACHE_MS) {
-    serverMeasure.note(
-      traceLabel("Token feed cache hit", {
-        ageMs: now - cachedAt,
-        tokens: cached.tokens.length,
-      }),
-    );
-    return cached;
-  }
-  if (pending) {
-    serverMeasure.note("Join pending token feed build");
-    return pending;
+  const planned: IndexedToken[] = [];
+  const add = (mints: string[], ttl: number) => {
+    for (const mint of mints) {
+      const token = byMint.get(mint);
+      const cached = priceCache.get(mint);
+      const excluded = (staticPoolInvalidUntil.get(mint) ?? 0) > now;
+      if (token && !excluded && (!cached || now - cached.fetchedAt >= ttl))
+        planned.push(token);
+    }
+  };
+  add(unique(priority.selected), 5_000);
+  add(unique(priority.open), 8_000);
+  add(unique(priority.visible), 15_000);
+  add(unique(priority.pinned), 30_000);
+
+  // A just-indexed migration must not wait behind seeded or older markets.
+  // Warm the newest uncached pools first, then continue round-robin refreshes.
+  if (planned.length < PRICE_REFRESH_LIMIT) {
+    const newestUncached = tokens
+      .filter((token) => !priceCache.has(token.mint))
+      .sort(
+        (left, right) =>
+          (right.migrated_at_ms ?? 0) - (left.migrated_at_ms ?? 0) ||
+          (right.migration_slot ?? 0) - (left.migration_slot ?? 0),
+      );
+    for (const token of newestUncached) {
+      const excluded = (staticPoolInvalidUntil.get(token.mint) ?? 0) > now;
+      if (!excluded) planned.push(token);
+      if (planned.length >= PRICE_REFRESH_LIMIT) break;
+    }
   }
 
-  pending = serverMeasure(
-    traceLabel("Refresh token feed cache", { force }),
-    async () => {
-      try {
-        const payload = await buildFeed();
-        cached = payload;
-        cachedAt = Date.now();
-        return payload;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        serverMeasure.note(
-          traceLabel("Token feed refresh degraded", { message }),
-        );
-        if (cached) {
-          return {
-            ...cached,
-            updatedAt: Date.now(),
-            warning: `Using cached token data: ${message}`,
-          };
-        }
-        return {
-          tokens: [],
-          updatedAt: Date.now(),
-          source: "upstream unavailable",
-          warning: message,
-        };
+  // Continue through stale cached markets without blocking the response on all rows.
+  if (planned.length < PRICE_REFRESH_LIMIT && tokens.length > 0) {
+    for (let offset = 0; offset < tokens.length; offset += 1) {
+      const token = tokens[(refreshCursor + offset) % tokens.length]!;
+      const cached = priceCache.get(token.mint);
+      const excluded = (staticPoolInvalidUntil.get(token.mint) ?? 0) > now;
+      if (!excluded && (!cached || now - cached.fetchedAt >= 30_000)) {
+        planned.push(token);
+        refreshCursor = (refreshCursor + offset + 1) % tokens.length;
+        if (planned.length >= PRICE_REFRESH_LIMIT) break;
       }
-    },
-  ).finally(() => {
-    pending = null;
-  });
-  return pending;
+    }
+  }
+  return [...new Map(planned.map((token) => [token.mint, token])).values()].slice(
+    0,
+    PRICE_REFRESH_LIMIT,
+  );
 }
+
+function feedToken(token: IndexedToken): FeedToken {
+  const price = priceCache.get(token.mint);
+  const priceSol = price?.priceSol ?? null;
+  const solUsd = solUsdCache.value;
+  return {
+    mint: token.mint,
+    pairAddress: token.pool,
+    poolBaseToken: token.pool_base_token,
+    poolQuoteToken: token.pool_quote_token,
+    quoteMint: token.quote_mint,
+    baseDecimals: staticPoolCache.get(token.mint)?.baseDecimals ?? 6,
+    symbol: token.symbol || token.mint.slice(0, 6),
+    name: token.name || token.symbol || token.mint,
+    imageUrl: token.image_url,
+    dexId: "pumpswap",
+    quoteSymbol: "SOL",
+    url: `https://solscan.io/account/${token.pool}`,
+    priceUsd: priceSol != null && solUsd != null ? priceSol * solUsd : null,
+    priceNative: priceSol,
+    marketCap: price?.marketCapUsd ?? null,
+    fdv: price?.marketCapUsd ?? null,
+    liquidityUsd: price?.liquidityUsd ?? null,
+    marketCapSol: price?.marketCapSol ?? null,
+    liquiditySol: price?.liquiditySol ?? null,
+    pairCreatedAt: token.migrated_at_ms ?? token.created_at_ms ?? 0,
+    tokenCreatedAt: token.created_at_ms > 0 ? token.created_at_ms : null,
+    newPair:
+      token.migrated_at_ms != null &&
+      Date.now() - token.migrated_at_ms < NEW_PAIR_MS,
+    migrated: true,
+    activePerp: true,
+    marketAddress: token.pool,
+    maxLeverage: 25,
+    paused: false,
+    settlementMode: false,
+    source: "onchain",
+    seeded: token.seed_rank != null,
+    seedRank: token.seed_rank,
+  };
+}
+
+export async function getTokenFeed(
+  priority: FeedPriority = {},
+): Promise<TokenFeedPayload> {
+  const database = marketDatabase();
+  const tokens = database.listMigratedTokens(MAX_FEED_TOKENS);
+  const requested = unique([
+    ...(priority.selected ?? []),
+    ...(priority.open ?? []),
+    ...(priority.pinned ?? []),
+  ]);
+  const byMint = new Map(tokens.map((token) => [token.mint, token]));
+  for (const mint of requested) {
+    if (byMint.has(mint)) continue;
+    const token = database.findMigratedToken(mint);
+    if (token) {
+      tokens.push(token);
+      byMint.set(mint, token);
+    }
+  }
+  const plan = refreshPlan(tokens, priority);
+  const refreshes = await Promise.allSettled(plan.map((token) => refreshPrice(token)));
+  const failures = refreshes.filter((result) => result.status === "rejected");
+  const warning = failures.length
+    ? `${failures.length} prioritized price refresh${failures.length === 1 ? "" : "es"} failed; cached values retained.`
+    : undefined;
+  const readyTokens = tokens.filter((token) => priceCache.has(token.mint));
+  return {
+    // A market enters the terminal only after a real reserve snapshot has
+    // produced price, market cap and liquidity. This avoids empty metric cells
+    // without inventing values; failed reads remain queued for retry.
+    tokens: readyTokens.map(feedToken),
+    updatedAt: Date.now(),
+    source: "SQD Pump migrate index + shared SQLite + cached reserve prices",
+    ...(warning ? { warning } : {}),
+  };
+}
+
+export async function getPumpSwapTokenByMint(
+  mint: string,
+): Promise<FeedToken | null> {
+  const token = marketDatabase().findMigratedToken(mint);
+  if (!token) return null;
+  try {
+    await refreshPrice(token);
+  } catch {
+    // A previously cached reserve snapshot remains usable; otherwise the mint
+    // stays out of the terminal until a real price can be read.
+  }
+  return priceCache.has(token.mint) ? feedToken(token) : null;
+}
+
+export async function searchPumpSwapTokens(
+  query: string,
+  limit = 12,
+): Promise<FeedToken[]> {
+  const matches = marketDatabase().searchMigratedTokens(query, limit);
+  if (matches.length === 0) return [];
+  // Search is interactive, so prioritize the matching pools immediately. Only
+  // return rows backed by a real reserve snapshot; no blank metric result is
+  // introduced into the terminal by search.
+  await Promise.allSettled(
+    matches.slice(0, PRICE_REFRESH_LIMIT).map((token) => refreshPrice(token)),
+  );
+  return matches
+    .filter((token) => priceCache.has(token.mint))
+    .map(feedToken)
+    .slice(0, limit);
+}
+

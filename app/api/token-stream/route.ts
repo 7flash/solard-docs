@@ -1,71 +1,71 @@
+import { tokenStreamManager } from "../../lib/token-stream-server";
+import type { TokenStreamMessage } from "../../lib/new-token";
 import { serverMeasure } from "../../../src/observability/server";
-import { getTokenFeed } from "../../../src/server/token-feed";
+
+function eventFrame(event: string, payload: unknown): Uint8Array {
+  return new TextEncoder().encode(
+    `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`,
+  );
+}
 
 export function GET(request: Request) {
-  const response = serverMeasure.measureSync(
+  return serverMeasure.measureSync(
     {
       label: "GET /api/token-stream",
       result: (value: Response) => ({ status: value.status }),
     },
     () => {
-      const encoder = new TextEncoder();
-      let timer: ReturnType<typeof setInterval> | null = null;
+      let heartbeat: ReturnType<typeof setInterval> | null = null;
+      let unsubscribe: (() => void) | null = null;
       let closed = false;
-      let sequence = 0;
 
       const stream = new ReadableStream<Uint8Array>({
         start(controller) {
-          const push = async () => {
+          const send = (message: TokenStreamMessage) => {
             if (closed) return;
-            sequence += 1;
-            await serverMeasure.measure(
-              {
-                label: "SSE token snapshot",
-                sequence,
-                budget: 4_000,
-                result: (count: number) => ({ tokens: count }),
-              },
-              async () => {
-                const payload = await getTokenFeed();
-                if (closed) return payload.tokens.length;
-                controller.enqueue(
-                  encoder.encode(
-                    `event: snapshot\ndata: ${JSON.stringify(payload)}\n\n`,
-                  ),
-                );
-                return payload.tokens.length;
-              },
-            );
+            try {
+              controller.enqueue(eventFrame(message.type, message));
+            } catch {
+              closed = true;
+            }
           };
 
-          controller.enqueue(encoder.encode(": SOLARD token stream\n\n"));
-          void push();
-          timer = setInterval(() => void push(), 10_000);
-
-          request.signal.addEventListener(
-            "abort",
-            () => {
+          unsubscribe = tokenStreamManager.subscribe(send);
+          send({ type: "snapshot", snapshot: tokenStreamManager.snapshot() });
+          heartbeat = setInterval(() => {
+            if (closed) return;
+            try {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  `event: heartbeat\ndata: ${Date.now()}\n\n`,
+                ),
+              );
+            } catch {
               closed = true;
-              if (timer) clearInterval(timer);
-              timer = null;
-              serverMeasure.measure({
-                label: "SSE client disconnected",
-                sequence,
-              });
-              try {
-                controller.close();
-              } catch {
-                /* already closed */
-              }
-            },
-            { once: true },
-          );
+            }
+          }, 10_000);
+
+          const close = () => {
+            if (closed) return;
+            closed = true;
+            if (heartbeat) clearInterval(heartbeat);
+            heartbeat = null;
+            unsubscribe?.();
+            unsubscribe = null;
+            try {
+              controller.close();
+            } catch {
+              // The browser may already have closed the stream.
+            }
+          };
+          request.signal.addEventListener("abort", close, { once: true });
         },
         cancel() {
           closed = true;
-          if (timer) clearInterval(timer);
-          timer = null;
-          serverMeasure.measure({ label: "SSE stream cancelled", sequence });
+          if (heartbeat) clearInterval(heartbeat);
+          heartbeat = null;
+          unsubscribe?.();
+          unsubscribe = null;
         },
       });
 
@@ -78,14 +78,10 @@ export function GET(request: Request) {
         },
       });
     },
-    (error) =>
+    (error: unknown) =>
       new Response(
         `Token stream failed: ${error instanceof Error ? error.message : String(error)}`,
         { status: 500 },
       ),
-  );
-  return (
-    response ||
-    new Response("Token stream failed before initialization.", { status: 500 })
   );
 }
